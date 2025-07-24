@@ -1,15 +1,30 @@
 "use client";
-
-import { PrivyProvider } from "@privy-io/react-auth";
 import { PropsWithChildren } from "react";
+import { CampProvider } from "@campnetwork/origin/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { PrivyProvider } from "@privy-io/react-auth";
 import { myCustomChain } from "@/components/MyCustomChain";
-import { addRpcUrlOverrideToChain } from "@privy-io/chains";
+import { http } from "viem";
+import { WagmiProvider, createConfig } from "@privy-io/wagmi";
 
 export function Providers({ children }: PropsWithChildren) {
-  const mainnetOverride = addRpcUrlOverrideToChain(
-    myCustomChain,
-    "https://rpc.basecamp.t.raas.gelato.cloud"
-  );
+  // Tạo QueryClient instance
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 1000 * 60 * 5, // 5 minutes
+        refetchOnWindowFocus: false,
+      },
+    },
+  });
+  const wagmiConfig = createConfig({
+    chains: [myCustomChain],
+    transports: {
+      [myCustomChain.id]: http(),
+    },
+    pollingInterval: 0,
+  });
+
   return (
     <PrivyProvider
       appId="cmd4f5ai701bdky0mlghn1gr5" // 👉 thay bằng appId của bạn
@@ -17,10 +32,16 @@ export function Providers({ children }: PropsWithChildren) {
         embeddedWallets: {
           createOnLogin: "all-users",
         },
-        supportedChains: [mainnetOverride],
+        supportedChains: [myCustomChain],
       }}
     >
-      {children}
+      <QueryClientProvider client={queryClient}>
+        <WagmiProvider config={wagmiConfig}>
+          <CampProvider clientId="fce77d7a-8085-47ca-adff-306a933e76aa">
+            {children}
+          </CampProvider>
+        </WagmiProvider>
+      </QueryClientProvider>
     </PrivyProvider>
   );
 }

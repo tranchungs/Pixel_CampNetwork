@@ -2,64 +2,145 @@
 
 import { useRef, useEffect, useState } from "react";
 import { useStateTogether } from "react-together";
-import { useWallets, useSendTransaction } from "@privy-io/react-auth";
-import { encodeFunctionData, parseAbi } from "viem";
+import { CampModal } from "@campnetwork/origin/react";
+import {
+  createWalletClient,
+  encodeFunctionData,
+  parseAbi,
+  parseEther,
+  webSocket,
+} from "viem";
 import { myCustomChain } from "./MyCustomChain";
 import TransactionToast from "./TransactionToast";
 import { createPublicClient, http } from "viem";
-import ChatGame from "./ChatGame";
-import { getPinataService } from "./pinataService";
+import { useAuth, useViem } from "@campnetwork/origin/react";
 import BombTargetHighlight from "./BombTargetHighlight";
 import BoomEffect from "./BoomEffect";
+import RocketStrike from "./RocketEffect";
+import {
+  useAccount,
+  useConnect,
+  useDisconnect,
+  useSendTransaction,
+  useSwitchChain,
+} from "wagmi";
+
+import WeaponShop, { WeaponType, WeaponItem } from "./WeaponShop";
+import { getPinataService } from "./pinataService";
 
 // Internal BoomEffect Component
 const CANVAS_SIZE = 500;
 const INITIAL_SCALE = 16;
 const MIN_SCALE = 3;
+const DEFAULT_CANVAS_WIDTH = 375; // Default mobile width
+const DEFAULT_CANVAS_HEIGHT = 600; // Default mobile height
 
 const COLORS = [
-  "#E46E6E",
-  "#FFD635",
-  "#7EED56",
-  "#00CCC0",
-  "#51E9F4",
-  "#94B3FF",
-  "#E4ABFF",
-  "#FF99AA",
-  "#FFB470",
-  "#FFFFFF",
-  "#BE0039",
-  "#FF9600",
-  "#00CC78",
-  "#009EAA",
-  "#3690EA",
-  "#6A5CFF",
-  "#B44AC0",
-  "#FF3881",
-  "#9C6926",
-  "#898D90",
-  "#6D001A",
-  "#BF4300",
-  "#00A368",
-  "#00756F",
-  "#2450A4",
-  "#493AC1",
-  "#811E9F",
-  "#A00357",
-  "#6D482F",
-  "#000000",
-];
+  // Màu gốc
+  "#E46E6E", // Đỏ nhạt
+  "#FFD635", // Vàng
+  "#7EED56", // Xanh lá nhạt
+  "#00CCC0", // Xanh ngọc
+  "#51E9F4", // Xanh da trời nhạt
+  "#94B3FF", // Xanh tím nhạt
+  "#E4ABFF", // Tím nhạt
+  "#FF99AA", // Hồng nhạt
+  "#FFB470", // Cam nhạt
+  "#FFFFFF", // Trắng
+  "#BE0039", // Đỏ đậm
+  "#FF9600", // Cam
+  "#00CC78", // Xanh lá
+  "#009EAA", // Xanh ngọc đậm
+  "#3690EA", // Xanh da trời
+  "#6A5CFF", // Xanh tím
+  "#B44AC0", // Tím
+  "#FF3881", // Hồng đậm
+  "#9C6926", // Nâu vàng
+  "#898D90", // Xám
+  "#6D001A", // Đỏ rượu
+  "#BF4300", // Cam đậm
+  "#00A368", // Xanh lá đậm
+  "#00756F", // Xanh rêu
+  "#2450A4", // Xanh navy
+  "#493AC1", // Tím đậm
+  "#811E9F", // Tím violet
+  "#A00357", // Hồng đậm
+  "#6D482F", // Nâu
+  "#000000", // Đen
 
-const CONTRACT_ADDRESS = "0xBE2E9dE2B192aC3845a6034d68724D21CA323BF9";
+  // Thêm màu mới
+  "#FF6B6B", // Đỏ coral
+  "#4ECDC4", // Xanh mint
+  "#45B7D1", // Xanh dương nhạt
+  "#96CEB4", // Xanh lá pastel
+  "#FFEAA7", // Vàng kem
+  "#DDA0DD", // Tím plum
+  "#98D8C8", // Xanh ngọc nhạt
+  "#F7DC6F", // Vàng nhạt
+  "#BB8FCE", // Tím lavender
+  "#85C1E9", // Xanh sky
+  "#F8C471", // Cam vàng
+  "#82E0AA", // Xanh lá mint
+  "#F1948A", // Hồng salmon
+  "#85929E", // Xám xanh
+  "#D2B4DE", // Tím nhạt pastel
+  "#AED6F1", // Xanh baby
+  "#A9DFBF", // Xanh lá nhạt pastel
+  "#F9E79F", // Vàng pastel
+  "#D7BDE2", // Tím lilac
+  "#A3E4D7", // Xanh ngọc pastel
+  "#FAD7A0", // Cam peach
+  "#ABEBC6", // Xanh lá sea foam
+  "#F5B7B1", // Hồng pastel
+  "#BFC9CA", // Xám nhạt
+  "#E8DAEF", // Tím rất nhạt
+  "#D6EAF8", // Xanh ice
+  "#D1F2EB", // Xanh mint rất nhạt
+  "#FCF3CF", // Vàng cream
+  "#FADBD8", // Hồng rất nhạt
+  "#EAEDED", // Xám rất nhạt
+
+  // Màu gradient và tone đặc biệt
+  "#FF7675", // Đỏ french
+  "#74B9FF", // Xanh french
+  "#FD79A8", // Hồng french
+  "#FDCB6E", // Vàng french
+  "#6C5CE7", // Tím french
+  "#00B894", // Xanh lá french
+  "#E17055", // Cam đất
+  "#A29BFE", // Tím periwinkle
+  "#FD83A8", // Hồng watermelon
+  "#55A3FF", // Xanh dodger
+  "#26D0CE", // Xanh turquoise
+  "#FEA47F", // Cam peach
+  "#B8860B", // Vàng darkgoldenrod
+  "#32CD32", // Xanh lime
+  "#FF1493", // Hồng deep pink
+  "#00BFFF", // Xanh deep sky
+  "#FF4500", // Cam red orange
+  "#9370DB", // Tím medium purple
+  "#20B2AA", // Xanh light sea green
+  "#DC143C", // Đỏ crimson
+];
+const CONTRACT_ADDRESS = "0x40C1c12be203d7F439960B8E7D0e56239e46913f";
 const CONTRACT_ABI = parseAbi([
   "event AreaBombed(address indexed user, uint256 x, uint256 y, uint256 radius)",
+  "event RocketFired(address indexed user, uint256 x, uint256 y, uint256 radius)",
   "function bombs(address user) external view returns (uint256)",
-  "function bombPrice() view returns (uint256)",
+  "function rockets(address user) external view returns (uint256)",
+  "function bombPrice() external view returns (uint256)", // Keep old function
+  "function rocketPrice() external view returns (uint256)", // Keep old function
   "function buyBomb() external payable",
   "function bombArea(uint256 centerX, uint256 centerY, uint256 radius) external",
   "function placePixel(uint256 x, uint256 y, string color) external",
   "function mintNFT(string memory tokenURI) external returns (uint256)",
   "event NFTMinted(address indexed to, uint256 tokenId, string tokenURI)",
+  "function fireRocket(uint256 centerX, uint256 centerY, uint256 radius) external",
+  "function buyBomb() external payable",
+  "function buyRocket() external payable",
+  "function claimDaily() external payable",
+  "function canClaimToday(address user) external view returns (bool)",
+  "function dailyClaimFee() external view returns (uint256)",
 ]);
 
 export default function PixelBoard() {
@@ -72,15 +153,20 @@ export default function PixelBoard() {
     "selectedColor",
     "#FFD635"
   );
+  const { origin, jwt, viem } = useAuth();
+  const { data: hash, sendTransaction } = useSendTransaction();
+  const { isConnected, address } = useAccount();
+  // 🔧 FIX: Canvas size state instead of direct window access
+  const [canvasSize, setCanvasSize] = useState({
+    width: DEFAULT_CANVAS_WIDTH,
+    height: DEFAULT_CANVAS_HEIGHT,
+  });
+  const [isMounted, setIsMounted] = useState(false);
 
   const client = createPublicClient({
     chain: myCustomChain,
     transport: http(),
   });
-  const pinata = getPinataService();
-  const { sendTransaction } = useSendTransaction();
-  const wallets = useWallets();
-
   const [toast, setToast] = useState<{
     message: string;
     type: "success" | "error";
@@ -106,7 +192,8 @@ export default function PixelBoard() {
   const [overlayOffset, setOverlayOffset] = useState({ x: 5, y: 5 });
   const [overlayLocked, setOverlayLocked] = useState(false);
   const [userBombs, setUserBombs] = useState(0);
-  const [userEnergy, setUserEnergy] = useState(667734);
+  const [userRockets, setUserRockets] = useState(0);
+
   const [showColorPalette, setShowColorPalette] = useState(false);
 
   // NFT States
@@ -139,13 +226,45 @@ export default function PixelBoard() {
   const touchStartTime = useRef(0);
   const hasMoved = useRef(false);
 
-  // Mobile canvas size - full available space
-  const canvasWidth = window.innerWidth;
-  const canvasHeight = window.innerHeight - 140; // Header + Bottom bar
-
   // Interaction disabled check
   const isInteractionDisabled =
     targetHighlights.length > 0 || isSelectingNFTArea;
+  //ROCKET
+  const [isActive, setIsActive] = useState(false);
+  const [targetPos, setTargetPos] = useState({ x: 250, y: 250 });
+  const [scaleRocket] = useState(16);
+  const [offsetRocket] = useState({ x: 200, y: 200 });
+  const [showExplosion, setShowExplosion] = useState(false);
+  //SHOP
+  const [showWeaponShop, setShowWeaponShop] = useState(false);
+  const [currentWeaponItem, setCurrentWeaponItem] = useState<WeaponItem | null>(
+    null
+  );
+  //DaiLy
+  const [isClaimingDaily, setIsClaimingDaily] = useState(false);
+  const [canClaimDaily, setCanClaimDaily] = useState(false);
+  const pinata = getPinataService();
+  // 🔧 FIX: Handle canvas sizing after component mounts
+  useEffect(() => {
+    setIsMounted(true);
+
+    const updateCanvasSize = () => {
+      if (typeof window !== "undefined") {
+        setCanvasSize({
+          width: window.innerWidth,
+          height: window.innerHeight - 140, // Header + Bottom bar
+        });
+      }
+    };
+
+    updateCanvasSize();
+    window.addEventListener("resize", updateCanvasSize);
+    return () => window.removeEventListener("resize", updateCanvasSize);
+  }, []);
+
+  // Use canvas size from state
+  const canvasWidth = canvasSize.width;
+  const canvasHeight = canvasSize.height;
 
   const getColor = (x: number, y: number): string => {
     const key = `${x},${y}`;
@@ -314,13 +433,14 @@ export default function PixelBoard() {
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || !isMounted) return; // 🔧 FIX: Only draw after mounted
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     canvas.width = canvasWidth;
     canvas.height = canvasHeight;
     draw(ctx);
   }, [
+    isMounted, // 🔧 FIX: Add isMounted dependency
     scale,
     offset.x,
     offset.y,
@@ -344,46 +464,61 @@ export default function PixelBoard() {
 
   // Load bomb count
   const loadBombCount = async () => {
-    if (!wallets.ready) return;
-    const injectedWallet = wallets.wallets.find(
-      (wallet) => wallet.connectorType === "injected"
-    );
-    if (!injectedWallet) return;
-
+    if (!origin || !isConnected) {
+      return;
+    }
     try {
       const bombCount = await client.readContract({
         address: CONTRACT_ADDRESS,
         abi: CONTRACT_ABI,
         functionName: "bombs",
-        args: [injectedWallet.address as `0x${string}`],
+        args: [address as `0x${string}`],
       });
+
       setUserBombs(Number(bombCount));
     } catch (error) {
       console.error("Failed to load bomb count:", error);
     }
   };
+  const loadRocketCount = async () => {
+    if (!origin || !isConnected) {
+      return;
+    }
+    try {
+      const rocketCount = await client.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: CONTRACT_ABI,
+        functionName: "rockets",
+        args: [address as `0x${string}`],
+      });
+
+      setUserRockets(Number(rocketCount));
+    } catch (error) {
+      console.error("Failed to load bomb count:", error);
+    }
+  };
+  const handleReloadAsset = async () => {
+    loadBombCount();
+    loadRocketCount();
+  };
 
   useEffect(() => {
     loadBombCount();
-  }, [wallets.ready, userBombs]);
+    loadRocketCount();
+  }, [isConnected]);
 
   // Event listener for bombs
   useEffect(() => {
-    if (!wallets.ready) return;
-    const injectedWallet = wallets.wallets.find(
-      (wallet) => wallet.connectorType === "injected"
-    );
-    if (!injectedWallet) return;
+    if (!isConnected || !client || !CONTRACT_ADDRESS) return;
 
-    const unwatch = client.watchContractEvent({
+    const unwatchBombs = client.watchContractEvent({
       address: CONTRACT_ADDRESS,
       abi: CONTRACT_ABI,
       eventName: "AreaBombed",
       onLogs: (logs) => {
         for (const log of logs) {
           const { x, y, radius } = log.args;
-          const isMyBomb = log.args?.user === injectedWallet.address;
-
+          const isMyBomb = log.args?.user === address;
           if (!isMyBomb) {
             setBooms((prev) => [
               ...prev,
@@ -415,13 +550,92 @@ export default function PixelBoard() {
           }
           setPixelUpdates((prev) => ({ ...prev, ...updates }));
         }
-        loadBombCount();
       },
+      onError: (logs) => {},
     });
+    const unwatchRockets = client.watchContractEvent({
+      address: CONTRACT_ADDRESS as `0x${string}`,
+      abi: CONTRACT_ABI,
+      eventName: "RocketFired",
+      onLogs: (logs) => {
+        for (const log of logs) {
+          const { x, y, radius } = log.args;
+          const isMyRocket = log.args?.user === address;
+          if (!isMyRocket) {
+            setIsActive(true);
+            setTargetPos({ x: Number(x), y: Number(y) });
+          }
+        }
+      },
+      onError: (log) => {},
+    });
+    return () => {
+      unwatchBombs();
+      unwatchRockets();
+    };
+  }, [isConnected]);
+  //DAiLY
+  const checkCanClaimDaily = async () => {
+    if (!isConnected || !client || !CONTRACT_ADDRESS || !address) {
+      setCanClaimDaily(false);
+      return;
+    }
 
-    return () => unwatch();
-  }, [wallets.ready]);
+    try {
+      const canClaim = await client.readContract({
+        address: CONTRACT_ADDRESS as `0x${string}`,
+        abi: CONTRACT_ABI,
+        functionName: "canClaimToday",
+        args: [address as `0x${string}`],
+      });
+      setCanClaimDaily(Boolean(canClaim));
+    } catch (error) {
+      console.error("Failed to check daily claim:", error);
+      setCanClaimDaily(false);
+    }
+  };
+  useEffect(() => {
+    checkCanClaimDaily();
+  }, [isConnected, address, CONTRACT_ADDRESS]);
+  const handleClaimDaily = async () => {
+    if (!isConnected || !client || !CONTRACT_ADDRESS) return;
 
+    setIsClaimingDaily(true);
+    try {
+      const FeeClaim = await client.readContract({
+        address: CONTRACT_ADDRESS as `0x${string}`,
+        abi: CONTRACT_ABI,
+        functionName: "dailyClaimFee",
+        args: [],
+      });
+      const data = encodeFunctionData({
+        abi: CONTRACT_ABI,
+        functionName: "claimDaily",
+        args: [],
+      });
+
+      await sendTransaction(
+        { to: CONTRACT_ADDRESS as `0x${string}`, value: FeeClaim, data },
+        {
+          onSuccess(data) {
+            const shortHash = `${data.slice(0, 6)}...${data.slice(-4)}`;
+            setToast({
+              message: `🎁 Daily rewards claimed! ${shortHash}`,
+              type: "success",
+            });
+          },
+          onError(error) {
+            setToast({ message: "Daily claim failed!", type: "error" });
+          },
+        }
+      );
+    } catch (error) {
+      console.log(error);
+      setToast({ message: "Daily claim failed!", type: "error" });
+    } finally {
+      setIsClaimingDaily(false);
+    }
+  };
   // FIXED: More precise pixel detection
   const getEventPos = (e: React.TouchEvent | React.MouseEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -742,10 +956,10 @@ export default function PixelBoard() {
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || !isMounted) return; // 🔧 FIX: Only add listener after mounted
     canvas.addEventListener("wheel", handleWheel, { passive: false });
     return () => canvas.removeEventListener("wheel", handleWheel);
-  }, [scale, offset, isInteractionDisabled]);
+  }, [scale, offset, isInteractionDisabled, isMounted]); // 🔧 FIX: Add isMounted dependency
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -791,31 +1005,16 @@ export default function PixelBoard() {
     // Clear the input so same file can be selected again
     e.target.value = "";
   };
+
   const handlePaint = async () => {
     if (!selectedPixel) {
       setToast({ message: "Please select a pixel first", type: "error" });
       return;
     }
-
-    if (userEnergy <= 0) {
-      setToast({ message: "No energy left!", type: "error" });
-      return;
-    }
-
     const key = `${selectedPixel.x},${selectedPixel.y}`;
-
     if (isOnchain) {
-      // Onchain painting with wallet transaction
-      const injectedWallet = wallets.wallets.find(
-        (wallet) => wallet.connectorType === "injected"
-      );
-      if (!injectedWallet) {
-        setToast({ message: "Please connect wallet", type: "error" });
-        return;
-      }
-
       try {
-        await injectedWallet.switchChain(myCustomChain.id);
+        setToast({ message: "Wait confirm transaction", type: "success" });
         const data = encodeFunctionData({
           abi: CONTRACT_ABI,
           functionName: "placePixel",
@@ -825,87 +1024,175 @@ export default function PixelBoard() {
             selectedColor,
           ],
         });
-
-        const hash = await sendTransaction(
-          { to: CONTRACT_ADDRESS, data },
-          { address: injectedWallet.address }
+        await sendTransaction(
+          { to: CONTRACT_ADDRESS as `0x${string}`, data },
+          {
+            onSuccess(data) {
+              setPixelUpdates((prev) => ({ ...prev, [key]: selectedColor }));
+            },
+            onError(error) {
+              setToast({ message: "Transaction failed!", type: "error" });
+            },
+          }
         );
-
-        const shortHash = `${hash.hash.slice(0, 6)}...${hash.hash.slice(-4)}`;
-        setPixelUpdates((prev) => ({ ...prev, [key]: selectedColor }));
-        setUserEnergy((prev) => Math.max(0, prev - 1));
-        setToast({
-          message: `🎨 Painted (${selectedPixel.x}, ${selectedPixel.y}) onchain! ${shortHash}`,
-          type: "success",
-        });
       } catch (err) {
+        console.log(err);
         setToast({ message: "Transaction failed!", type: "error" });
       }
     } else {
-      // Offchain painting - direct update
       setPixelUpdates((prev) => ({ ...prev, [key]: selectedColor }));
-      setUserEnergy((prev) => Math.max(0, prev - 1));
     }
   };
 
   const handleBombAction = async () => {
-    if (!selectedPixel && targetHighlights.length === 0) {
-      setToast({ message: "Please select a pixel to bomb", type: "error" });
-      return;
-    }
+    if (!isConnected) return;
+    const bombCount = (await client?.readContract({
+      address: CONTRACT_ADDRESS as `0x${string}`,
+      abi: CONTRACT_ABI,
+      functionName: "bombs",
+      args: [address as `0x${string}`],
+    })) as bigint;
 
-    if (userBombs <= 0) {
+    if (bombCount <= 0) {
       // Buy bomb
-      if (!wallets.ready) return;
-      const injectedWallet = wallets.wallets.find(
-        (wallet) => wallet.connectorType === "injected"
-      );
-      await injectedWallet!.switchChain(myCustomChain.id);
-
-      const price: bigint = await client.readContract({
-        address: CONTRACT_ADDRESS,
+      if (!origin || !isConnected) return;
+      const price = (await client.readContract({
+        address: CONTRACT_ADDRESS as `0x${string}`,
         abi: CONTRACT_ABI,
         functionName: "bombPrice",
+      })) as bigint;
+      setCurrentWeaponItem({
+        type: "bomb",
+        name: "Bomb",
+        emoji: "💣",
+        price: Number(price) / 1e18, // Convert wei to ETH
+        description: "Destroys 3x3 area",
       });
-
-      const data = encodeFunctionData({
-        abi: CONTRACT_ABI,
-        functionName: "buyBomb",
-        args: [],
-      });
-      const hash = await sendTransaction(
-        { to: CONTRACT_ADDRESS, value: price, data },
-        { address: injectedWallet!.address }
-      );
-      const shortHash = `${hash.hash.slice(0, 6)}...${hash.hash.slice(-4)}`;
-      const receipt = await client.waitForTransactionReceipt({
-        hash: hash.hash,
-      });
-
-      if (receipt.status == "success") {
-        setToast({
-          message: `💣 Bomb purchased! ${shortHash}`,
-          type: "success",
-        });
-        setUserBombs(userBombs + 1);
-      } else {
-        setToast({ message: "Purchase failed!", type: "error" });
-      }
+      setShowWeaponShop(true);
     } else {
-      // Throw bomb
-      const injectedWallet = wallets.wallets.find(
-        (wallet) => wallet.connectorType === "injected"
-      );
-      if (!injectedWallet || !selectedPixel) return;
-
+      if (!origin || !selectedPixel) {
+        setToast({
+          message: "Please select a pixel to throw Boom!",
+          type: "error",
+        });
+        return;
+      }
+      setToast({
+        message: "Wait confirm in wallet!",
+        type: "success",
+      });
       const targetId = Date.now();
       try {
-        await injectedWallet.switchChain(myCustomChain.id);
+        setTargetHighlights((prev) => [
+          ...prev,
+          {
+            x: selectedPixel.x,
+            y: selectedPixel.y,
+            radius: 3,
+            id: targetId,
+          },
+        ]);
         const data = encodeFunctionData({
           abi: CONTRACT_ABI,
           functionName: "bombArea",
           args: [BigInt(selectedPixel.x), BigInt(selectedPixel.y), BigInt(3)],
         });
+        await sendTransaction(
+          { to: CONTRACT_ADDRESS as `0x${string}`, data },
+          {
+            onSuccess(data) {
+              setTargetHighlights((prev) =>
+                prev.filter((t) => t.id !== targetId)
+              );
+              setBooms((prev) => [
+                ...prev,
+                {
+                  x: selectedPixel.x,
+                  y: selectedPixel.y,
+                  radius: 3,
+                  id: Date.now(),
+                },
+              ]);
+
+              const shortHash = `${data.slice(0, 6)}...${data.slice(-4)}`;
+              setToast({ message: `💥 BOOM! ${shortHash}`, type: "success" });
+
+              // Clear pixels immediately
+              const updates: Record<string, string> = {};
+              for (let dx = -3; dx <= 3; dx++) {
+                for (let dy = -3; dy <= 3; dy++) {
+                  const dist = Math.sqrt(dx * dx + dy * dy);
+                  if (dist <= 3) {
+                    const px = selectedPixel.x + dx;
+                    const py = selectedPixel.y + dy;
+                    const key = `${px},${py}`;
+                    updates[key] = "#111";
+                  }
+                }
+              }
+              setPixelUpdates((prev) => ({ ...prev, ...updates }));
+              setUserBombs(userBombs - 1);
+            },
+            onError(error) {
+              setTargetHighlights((prev) =>
+                prev.filter((t) => t.id !== targetId)
+              );
+              setToast({ message: "Bomb failed!", type: "error" });
+            },
+          }
+        );
+      } catch (error) {
+        setTargetHighlights((prev) => prev.filter((t) => t.id !== targetId));
+        setToast({ message: "Bomb failed!", type: "error" });
+      }
+    }
+  };
+
+  const handleFireRocket = async () => {
+    if (!isConnected || !origin) return;
+    const rocketCount = (await client.readContract({
+      address: CONTRACT_ADDRESS as `0x${string}`,
+      abi: CONTRACT_ABI,
+      functionName: "rockets",
+      args: [address as `0x${string}`],
+    })) as bigint;
+    if (rocketCount <= 0) {
+      const price = (await client.readContract({
+        address: CONTRACT_ADDRESS as `0x${string}`,
+        abi: CONTRACT_ABI,
+        functionName: "rocketPrice",
+      })) as bigint;
+
+      setCurrentWeaponItem({
+        type: "rocket",
+        name: "rocket",
+        emoji: "🚀",
+        price: Number(price) / 1e18,
+        description: "Destroys 3x3 area",
+      });
+      setShowWeaponShop(true);
+    } else {
+      if (!selectedPixel) {
+        setToast({
+          message: "Please select a pixel to fire rocket!",
+          type: "error",
+        });
+        return;
+      }
+      setToast({
+        message: "Wait confirm in wallet!",
+        type: "success",
+      });
+      const targetId = Date.now();
+      try {
+        const data = encodeFunctionData({
+          abi: CONTRACT_ABI,
+          functionName: "fireRocket",
+          args: [BigInt(selectedPixel.x), BigInt(selectedPixel.y), BigInt(3)],
+        });
+
+        // Set target và kích hoạt rocket
+        setTargetPos({ x: selectedPixel.x, y: selectedPixel.y });
 
         setTargetHighlights((prev) => [
           ...prev,
@@ -917,43 +1204,115 @@ export default function PixelBoard() {
           },
         ]);
 
-        const hash = await sendTransaction(
-          { to: CONTRACT_ADDRESS, data },
-          { address: injectedWallet.address }
-        );
-
-        setTargetHighlights((prev) => prev.filter((t) => t.id !== targetId));
-        setBooms((prev) => [
-          ...prev,
+        await sendTransaction(
+          { to: CONTRACT_ADDRESS as `0x${string}`, data },
           {
-            x: selectedPixel.x,
-            y: selectedPixel.y,
-            radius: 3,
-            id: Date.now(),
-          },
-        ]);
+            onSuccess(data) {
+              setIsActive(true);
+              const shortHash = `${data.slice(0, 6)}...${data.slice(-4)}`;
+              setToast({ message: `💥 Rocket! ${shortHash}`, type: "success" });
 
-        const shortHash = `${hash.hash.slice(0, 6)}...${hash.hash.slice(-4)}`;
-        setToast({ message: `💥 BOOM! ${shortHash}`, type: "success" });
-
-        // Clear pixels immediately
-        const updates: Record<string, string> = {};
-        for (let dx = -3; dx <= 3; dx++) {
-          for (let dy = -3; dy <= 3; dy++) {
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist <= 3) {
-              const px = selectedPixel.x + dx;
-              const py = selectedPixel.y + dy;
-              const key = `${px},${py}`;
-              updates[key] = "#111";
-            }
+              // Clear pixels immediately
+              const updates: Record<string, string> = {};
+              for (let dx = -3; dx <= 3; dx++) {
+                for (let dy = -3; dy <= 3; dy++) {
+                  const dist = Math.sqrt(dx * dx + dy * dy);
+                  if (dist <= 3) {
+                    const px = selectedPixel.x + dx;
+                    const py = selectedPixel.y + dy;
+                    const key = `${px},${py}`;
+                    updates[key] = "#111";
+                  }
+                }
+              }
+              setPixelUpdates((prev) => ({ ...prev, ...updates }));
+              setUserRockets(userRockets - 1);
+            },
+            onError(error) {
+              setTargetHighlights((prev) =>
+                prev.filter((t) => t.id !== targetId)
+              );
+              setToast({ message: "Bomb failed!", type: "error" });
+            },
           }
-        }
-        setPixelUpdates((prev) => ({ ...prev, ...updates }));
-        setUserBombs(userBombs - 1);
+        );
       } catch (error) {
         setTargetHighlights((prev) => prev.filter((t) => t.id !== targetId));
         setToast({ message: "Bomb failed!", type: "error" });
+      }
+    }
+  };
+
+  const handleWeaponPurchase = async (
+    weaponType: WeaponType,
+    quantity: number,
+    totalCost: number
+  ) => {
+    if (!isConnected) {
+      setToast({ message: "Disconnected!", type: "error" });
+      return;
+    }
+
+    if (weaponType === "bomb") {
+      const data = encodeFunctionData({
+        abi: CONTRACT_ABI,
+        functionName: "buyBomb",
+        args: [],
+      });
+      try {
+        await sendTransaction(
+          {
+            to: CONTRACT_ADDRESS as `0x${string}`,
+            value: parseEther(`${totalCost}`),
+            data,
+          },
+          {
+            onSuccess(data) {
+              const shortHash = `${data.slice(0, 6)}...${data.slice(-4)}`;
+              setToast({
+                message: `💣 Bomb purchased! ${shortHash} need reload`,
+                type: "success",
+              });
+              setUserBombs(userBombs + quantity);
+            },
+            onError(error) {
+              setToast({ message: "Purchase failed!", type: "error" });
+            },
+          }
+        );
+      } catch (error) {
+        setToast({ message: "Purchase failed!", type: "error" });
+      }
+    } else {
+      const data = encodeFunctionData({
+        abi: CONTRACT_ABI,
+        functionName: "buyRocket",
+        args: [],
+      });
+      try {
+        await sendTransaction(
+          {
+            to: CONTRACT_ADDRESS as `0x${string}`,
+            value: parseEther(`${totalCost}`),
+            data,
+          },
+          {
+            onSuccess(data) {
+              const shortHash = `${data.slice(0, 6)}...${data.slice(-4)}`;
+              setToast({
+                message: `💣 Rocket purchased! ${shortHash} need reload`,
+                type: "success",
+              });
+              setUserRockets(userRockets + quantity);
+            },
+            onError(error) {
+              setToast({ message: "Purchase failed!", type: "error" });
+            },
+          }
+        );
+      } catch (error) {
+        console.log(error);
+        setToast({ message: "Purchase failed!", type: "error" });
       }
     }
   };
@@ -1018,14 +1377,62 @@ export default function PixelBoard() {
     setToast({ message: "NFT selection cancelled", type: "success" });
   };
 
-  const handleMintNFT = async () => {
-    if (!wallets.ready) return;
-    const injectedWallet = wallets.wallets.find(
-      (wallet) => wallet.connectorType === "injected"
-    );
-    if (!selectedNFTArea || !nftImage) return;
+  const base64ToFile = (base64: string, filename: string): File => {
+    console.log("Original base64 length:", base64.length);
+    console.log("Base64 preview:", base64.substring(0, 100));
 
+    // Kiểm tra format base64
+    if (!base64.startsWith("data:image/")) {
+      throw new Error("Invalid base64 format - must start with 'data:image/'");
+    }
+
+    const arr = base64.split(",");
+    if (arr.length !== 2) {
+      throw new Error("Invalid base64 format - missing comma separator");
+    }
+
+    const mime = arr[0].match(/:(.*?);/)?.[1] || "image/png";
+    const bstr = atob(arr[1]);
+
+    console.log("Decoded string length:", bstr.length);
+
+    if (bstr.length === 0) {
+      throw new Error("Decoded base64 is empty");
+    }
+
+    const u8arr = new Uint8Array(bstr.length);
+    for (let i = 0; i < bstr.length; i++) {
+      u8arr[i] = bstr.charCodeAt(i);
+    }
+
+    const file = new File([u8arr], filename, { type: mime });
+    console.log("Created file size:", file.size);
+    console.log("Created file type:", file.type);
+
+    return file;
+  };
+
+  const fetchFileFromUrl = async (
+    url: string,
+    fileName: string
+  ): Promise<File> => {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new File([blob], fileName, { type: blob.type });
+  };
+
+  const handleMintNFT = async () => {
+    if (!origin || !jwt || !selectedNFTArea || !nftImage) {
+      return;
+    }
+    const licence = {
+      price: BigInt(0),
+      duration: 1,
+      royaltyBps: 0,
+      paymentToken: "0x0000000000000000000000000000000000000000",
+    } as const;
     try {
+      setToast({ message: "Wait confirm in Wallet", type: "success" });
       const metadata = {
         name: `Pixel Art`,
         description: `Pixel art created on canvas at coordinates (${selectedNFTArea.x}, ${selectedNFTArea.y})`,
@@ -1037,7 +1444,6 @@ export default function PixelBoard() {
           { trait_type: "Y Position", value: selectedNFTArea.y },
         ],
       };
-
       const result = await pinata.uploadCompleteNFT(nftImage, metadata);
       const data = encodeFunctionData({
         abi: CONTRACT_ABI,
@@ -1045,18 +1451,27 @@ export default function PixelBoard() {
         args: [result.metadataIPFS],
       });
 
-      const hash = await sendTransaction(
-        { to: CONTRACT_ADDRESS, data },
-        { address: injectedWallet!.address }
+      await sendTransaction(
+        { to: CONTRACT_ADDRESS as `0x${string}`, data },
+        {
+          onSuccess(data) {
+            const shortHash = `${data.slice(0, 6)}...${data.slice(-4)}`;
+            setToast({
+              message: `🎨 NFT minted! ${shortHash}`,
+              type: "success",
+            });
+
+            // Clear NFT selection after successful mint
+            setSelectedNFTArea(null);
+            setNftImage(null);
+          },
+          onError(error) {
+            setToast({ message: "NFT minting failed!", type: "error" });
+          },
+        }
       );
-
-      const shortHash = `${hash.hash.slice(0, 6)}...${hash.hash.slice(-4)}`;
-      setToast({ message: `🎨 NFT minted! ${shortHash}`, type: "success" });
-
-      // Clear NFT selection after successful mint
-      setSelectedNFTArea(null);
-      setNftImage(null);
     } catch (error) {
+      console.log(error);
       setToast({ message: "NFT minting failed!", type: "error" });
       // DON'T clear NFT selection on failure - user can try again
     }
@@ -1069,6 +1484,16 @@ export default function PixelBoard() {
     }, 3000);
     return () => clearInterval(timer);
   }, []);
+
+  // 🔧 FIX: Show loading screen until mounted
+  if (!isMounted) {
+    return (
+      <div className="h-screen bg-slate-900 text-white flex flex-col items-center justify-center">
+        <div className="text-2xl font-bold mb-4">🎨 Pixel Board</div>
+        <div className="text-gray-400">Loading canvas...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen bg-slate-900 text-white flex flex-col overflow-hidden">
@@ -1089,14 +1514,34 @@ export default function PixelBoard() {
         </div>
 
         <div className="flex items-center gap-3 text-sm">
-          <span className="flex items-center gap-1 text-gray-400">
-            <span>👥</span>
-          </span>
-          <div className="bg-slate-700 px-2 py-1 rounded flex items-center gap-1">
-            <span>📺</span>
-            <span>64</span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleClaimDaily}
+              disabled={!isConnected || !canClaimDaily || isClaimingDaily}
+              className={`px-3 py-2 rounded-lg transition-colors flex items-center gap-1 ${
+                canClaimDaily && isConnected
+                  ? "bg-yellow-600 hover:bg-yellow-700 text-white"
+                  : "bg-gray-600 text-gray-400 cursor-not-allowed"
+              }`}
+              title={
+                !isConnected
+                  ? "Connect wallet first"
+                  : !canClaimDaily
+                  ? "Already claimed today"
+                  : "Claim Daily Rewards"
+              }
+            >
+              {isClaimingDaily ? (
+                <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+              ) : (
+                <span className="text-lg">{canClaimDaily ? "🎁" : "⏰"}</span>
+              )}
+              <span className="text-sm font-medium">
+                {canClaimDaily ? "Claim" : "Claimed"}
+              </span>
+            </button>
           </div>
-          <button className="text-yellow-400 text-lg">⭐</button>
+          <CampModal />
         </div>
       </div>
 
@@ -1150,7 +1595,7 @@ export default function PixelBoard() {
                 style={{ imageRendering: "pixelated" }}
               />
             ) : (
-              <span className="text-gray-300">Upload</span>
+              <span className="text-gray-300">🖼️</span>
             )}
             {overlayImg && (
               <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border border-slate-700 rounded-full"></div>
@@ -1203,7 +1648,18 @@ export default function PixelBoard() {
               </div>
             </div>
           )}
-
+          {/* Rocket Button */}
+          <button
+            onClick={handleFireRocket}
+            className="w-12 h-12 bg-slate-700 hover:bg-slate-600 rounded flex items-center justify-center text-lg font-bold relative"
+          >
+            {isActive ? "🚀" : "🚀"}
+            {userRockets > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                {userRockets}
+              </span>
+            )}
+          </button>
           {/* Bomb Button */}
           <button
             onClick={handleBombAction}
@@ -1301,7 +1757,47 @@ export default function PixelBoard() {
             offset={offset}
           />
         ))}
+        <div className="absolute inset-0 pointer-events-none z-100">
+          {isActive && targetPos && (
+            <RocketStrike
+              targetX={targetPos.x}
+              targetY={targetPos.y}
+              scale={scale}
+              offset={offset}
+              isActive={true}
+              onComplete={() => {
+                // Tìm highlight target tương ứng để xóa
+                const currentTarget = targetHighlights.find(
+                  (t) => t.x === targetPos.x && t.y === targetPos.y
+                );
 
+                // Khi rocket đến đích, tạo boom effect
+                setBooms((prev) => [
+                  ...prev,
+                  {
+                    x: targetPos.x,
+                    y: targetPos.y,
+                    radius: 3,
+                    id: Date.now(),
+                  },
+                ]);
+
+                // Xóa highlight
+                if (currentTarget) {
+                  setTargetHighlights((prev) =>
+                    prev.filter((t) => t.id !== currentTarget.id)
+                  );
+                }
+
+                // Reset rocket state
+                setIsActive(false);
+                setTargetPos({ x: 0, y: 0 });
+
+                setToast({ message: "💥 Rocket hit target!", type: "success" });
+              }}
+            />
+          )}
+        </div>
         {/* Coordinate Display - Only for hover */}
         {hoverPixel && !selectedPixel && (
           <div className="absolute bottom-24 left-4 bg-black bg-opacity-75 px-2 py-1 rounded text-sm">
@@ -1361,33 +1857,38 @@ export default function PixelBoard() {
 
       {/* Color Palette Overlay */}
       {showColorPalette && (
-        <div className="absolute inset-0 bg-black bg-opacity-75 flex items-end z-50">
-          <div className="w-full bg-slate-800 p-4 rounded-t-2xl max-h-80 overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Choose Color</h3>
+        <div className="fixed inset-0 bg-[#00000038] flex items-end z-50">
+          <div className="w-full bg-slate-800 rounded-t-2xl max-h-96 flex flex-col">
+            {/* Header cố định */}
+            <div className="flex justify-between items-center p-4 pb-2 border-b border-slate-700 bg-slate-800 rounded-t-2xl">
+              <h3 className="text-lg font-semibold text-white">Choose Color</h3>
               <button
                 onClick={() => setShowColorPalette(false)}
-                className="text-gray-400 text-xl hover:text-white"
+                className="text-gray-400 text-xl hover:text-white transition-colors p-1"
               >
                 ✕
               </button>
             </div>
-            <div className="grid grid-cols-6 gap-3">
-              {COLORS.map((color) => (
-                <button
-                  key={color}
-                  className={`w-12 h-12 rounded border-2 transition-all ${
-                    selectedColor === color
-                      ? "border-white scale-110"
-                      : "border-gray-600 hover:border-gray-400"
-                  }`}
-                  style={{ backgroundColor: color }}
-                  onClick={() => {
-                    setSelectedColor(color);
-                    setShowColorPalette(false);
-                  }}
-                />
-              ))}
+
+            {/* Phần scroll được */}
+            <div className="flex-1 overflow-y-auto p-4 pt-2">
+              <div className="grid grid-cols-8 gap-3">
+                {COLORS.map((color) => (
+                  <button
+                    key={color}
+                    className={`w-12 h-12 rounded border-2 transition-all ${
+                      selectedColor === color
+                        ? "border-white scale-110"
+                        : "border-gray-600 hover:border-gray-400"
+                    }`}
+                    style={{ backgroundColor: color }}
+                    onClick={() => {
+                      setSelectedColor(color);
+                      setShowColorPalette(false);
+                    }}
+                  />
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -1415,7 +1916,13 @@ export default function PixelBoard() {
           </div>
 
           <div className="w-12 text-right">
-            <span className="text-gray-400 text-sm">info</span>
+            <button
+              onClick={handleReloadAsset} // hàm reload bạn tự định nghĩa
+              className="w-12 h-12 bg-slate-700 hover:bg-slate-600 rounded flex items-center justify-center text-lg font-bold relative"
+              title="Reload"
+            >
+              🔄
+            </button>
           </div>
         </div>
 
@@ -1431,9 +1938,6 @@ export default function PixelBoard() {
       </div>
 
       {/* Hidden Components */}
-      <div className="hidden">
-        <ChatGame />
-      </div>
 
       {/* Toast */}
       {toast && (
@@ -1441,6 +1945,18 @@ export default function PixelBoard() {
           message={toast.message}
           type={toast.type}
           onClose={() => setToast(null)}
+        />
+      )}
+      {currentWeaponItem && (
+        <WeaponShop
+          isVisible={showWeaponShop}
+          onClose={() => {
+            setShowWeaponShop(false);
+            setCurrentWeaponItem(null);
+          }}
+          onPurchase={handleWeaponPurchase}
+          weaponItem={currentWeaponItem}
+          isConnected={origin ? true : false}
         />
       )}
     </div>

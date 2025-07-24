@@ -42,7 +42,15 @@ export default function BoomEffect({
     // Bomb explosion colors (dark bomb + fire)
     const bombColors = ["#2C2C2C", "#404040", "#1A1A1A"]; // Dark bomb pieces
     const fireColors = ["#FFFFFF", "#FFFF00", "#FFA500", "#FF4500", "#FF0000"]; // Fire
-
+    const playExplosionSound = () => {
+      try {
+        const audio = new Audio("/boom_sound.mp3");
+        audio.volume = 0.5;
+        audio.play().catch((e) => console.log("Audio play failed:", e));
+      } catch (error) {
+        console.log("Sound not available:", error);
+      }
+    };
     const createBombExplosion = () => {
       const newPixels: PixelParticle[] = [];
       const explosionForce = 12; // 🚀 Strong explosion force
@@ -114,7 +122,7 @@ export default function BoomEffect({
 
       setPixels(newPixels);
     };
-
+    playExplosionSound();
     createBombExplosion();
 
     // Animate with physics
