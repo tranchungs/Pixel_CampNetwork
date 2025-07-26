@@ -1,36 +1,151 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🎮 Pixel Game
 
-## Getting Started
+**Collaborative Multiplayer Pixel Art on Blockchain**
 
-First, run the development server:
+A revolutionary gaming experience that combines real-time collaborative pixel art creation with strategic combat mechanics and NFT minting, built on Camp Network blockchain.
+
+[![Live Demo](https://img.shields.io/badge/🎮_Live_Demo-Play_Now-brightgreen)](https://pixel-camp-network.vercel.app/)
+[![Documentation]](https://pixel-game-campnetwork.gitbook.io/pixel-game-campnetwork-docs/)
+[![Video Demo](https://www.youtube.com/watch?v=4C6m8BbEcEo)](#)
+
+## 🎯 Overview
+
+Pixel Game transforms simple pixel placement into a rich, multi-layered entertainment experience where creativity meets strategy, community meets competition, and gaming moments become valuable digital assets.
+
+### ✨ Key Features
+
+- 🎨 **Real-Time Collaborative Canvas** - 500x500 shared pixel canvas with instant synchronization
+- ⚔️ **Strategic Combat System** - Purchase and deploy bombs (💣) and rockets (🚀)
+- 💎 **NFT Minting** - Mint canvas areas as permanent blockchain collectibles
+- 🖼️ **Template System** - Upload images to trace complex artwork
+- 🎯 **Daily Rewards** - Claim daily bonuses and build your arsenal
+- 📱 **Cross-Platform** - Seamless experience on mobile and desktop
+
+## 🚀 Live Demo
+
+**🎮 Play Now:** https://pixel-camp-network.vercel.app/
+
+## 🛠️ Tech Stack
+
+### Frontend
+
+- **React 18** with TypeScript
+- **react-together** (Multisynq) for real-time collaboration
+- **Tailwind CSS** for styling
+- **Canvas API** for optimized rendering
+
+### Blockchain
+
+- **Camp Network** (Basecamp testnet)
+- **Camp Origin SDK** for Web3 integration
+- **Solidity** smart contracts
+- **Viem & Wagmi** for blockchain interactions
+
+### Infrastructure
+
+- **Vercel** for deployment
+- **GitHub** for version control
+- **GitBook** for documentation
+
+## 🎮 How to Play
+
+### 1. **Connect Wallet**
+
+- Click the Camp Network modal to connect your wallet
+- Supports Camp Network's authentication system
+
+### 2. **Choose Your Mode**
+
+- **On-chain**: Permanent blockchain transactions
+- **Off-chain**: Fast, free experimentation
+
+### 3. **Start Creating**
+
+- Select colors from 60+ vibrant palette
+- Click pixels to place your art
+- Watch real-time collaboration unfold
+
+### 4. **Strategic Combat**
+
+- Purchase bombs (💣) and rockets (🚀)
+- Deploy weapons to clear areas
+- Create explosive visual effects
+
+### 5. **Mint NFTs**
+
+- Select canvas areas using camera tool (📸)
+- Mint your favorite moments as permanent NFTs
+- Own your collaborative achievements forever
+
+## 🏗️ Local Development
+
+### Prerequisites
+
+- Node.js 18+
+- npm or yarn
+- Camp Network wallet
+
+### Installation
 
 ```bash
+# Clone the repository
+git clone https://github.com/your-username/pixel-game.git
+cd pixel-game
+
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp .env.example .env.local
+# Add your Camp Network RPC and contract addresses
+
+# Start development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Environment Variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```env
+NEXT_PUBLIC_CAMP_NETWORK_RPC=https://rpc.camp-network-testnet.gelato.digital
+NEXT_PUBLIC_CONTRACT_ADDRESS=0x40C1c12be203d7F439960B8E7D0e56239e46913f
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 📄 Smart Contract
 
-## Learn More
+### Contract Address
 
-To learn more about Next.js, take a look at the following resources:
+**Basecamp Testnet:** `0x40C1c12be203d7F439960B8E7D0e56239e46913f`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Key Functions
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```solidity
+// Pixel placement
+function placePixel(uint256 x, uint256 y, string color) external
 
-## Deploy on Vercel
+// Weapon system
+function buyBomb() external payable
+function buyRocket() external payable
+function bombArea(uint256 centerX, uint256 centerY, uint256 radius) external
+function fireRocket(uint256 centerX, uint256 centerY, uint256 radius) external
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+// NFT minting
+function mintNFT(string memory tokenURI) external returns (uint256)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+// Daily rewards
+function claimDaily() external payable
+function canClaimToday(address user) external view returns (bool)
+```
+
+## 🎥 Demo Video
+
+[📺 Watch the full demo on YouTube](#)
+
+_See Pixel Game in action - from collaborative art creation to strategic combat and NFT minting!_
+
+## 📚 Documentation
+
+**Complete Documentation:** https://pixel-game-campnetwork.gitbook.io/pixel-game-campnetwork-docs/
+
+- [Getting Started](https://pixel-game-campnetwork.gitbook.io/pixel-game-campnetwork-docs/getting-started)
+- [Features Overview](https://pixel-game-campnetwork.gitbook.io/pixel-game-campnetwork-docs/features)
+- [For Developers](https://pixel-game-campnetwork.gitbook.io/pixel-game-campnetwork-docs/others/for-developers)

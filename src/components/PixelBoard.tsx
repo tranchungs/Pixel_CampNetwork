@@ -1515,6 +1515,15 @@ export default function PixelBoard() {
 
         <div className="flex items-center gap-3 text-sm">
           <div className="flex items-center gap-3">
+            <a
+              href="https://pixel-game-campnetwork.gitbook.io/pixel-game-campnetwork-docs/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:text-blue-300 transition-colors text-sm font-medium"
+              title="View Documentation"
+            >
+              📚 Docs
+            </a>
             <button
               onClick={handleClaimDaily}
               disabled={!isConnected || !canClaimDaily || isClaimingDaily}
