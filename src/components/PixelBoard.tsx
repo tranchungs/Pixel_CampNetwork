@@ -140,10 +140,7 @@ export default function PixelBoard() {
   const [pixelUpdates, setPixelUpdates] = useStateTogether<
     Record<string, string>
   >("pixelUpdates", {});
-  const [selectedColor, setSelectedColor] = useStateTogether(
-    "selectedColor",
-    "#FFD635"
-  );
+  const [selectedColor, setSelectedColor] = useState("#FFD635");
   const { origin, jwt, viem, walletAddress } = useAuth();
   const auth = useAuth();
   const { authenticated, loading } = useAuthState();
@@ -246,6 +243,14 @@ export default function PixelBoard() {
     showSuccess,
     hideSuccess,
   } = useSimpleNFTModal();
+  //QUICK_PAINT
+  const [localPixelUpdates, setLocalPixelUpdates] = useState<
+    Record<string, string>
+  >({});
+  const [isQuickPainting, setIsQuickPainting] = useState(false);
+  const [overlayPixelData, setOverlayPixelData] = useState<
+    { x: number; y: number; color: string }[]
+  >([]);
   // 🔧 FIX: Handle canvas sizing after component mounts
   useEffect(() => {
     setIsMounted(true);
@@ -284,7 +289,9 @@ export default function PixelBoard() {
 
   const getColor = (x: number, y: number): string => {
     const key = `${x},${y}`;
-    return pixelUpdates[key] || "#111";
+    if (localPixelUpdates[key]) return localPixelUpdates[key];
+    if (pixelUpdates[key]) return pixelUpdates[key];
+    return "#111";
   };
 
   const draw = (ctx: CanvasRenderingContext2D) => {
@@ -303,16 +310,22 @@ export default function PixelBoard() {
     // Draw pixels
     for (let y = startY; y < endY; y++) {
       for (let x = startX; x < endX; x++) {
-        const cx = Math.floor((x - offset.x) * scale);
-        const cy = Math.floor((y - offset.y) * scale);
+        // 🎯 CHÍNH XÁC: Vẽ pixel aligned với grid
+        const cx = (x - offset.x) * scale;
+        const cy = (y - offset.y) * scale;
 
         ctx.fillStyle = getColor(x, y);
-        ctx.fillRect(cx, cy, scale, scale);
+        ctx.fillRect(Math.floor(cx), Math.floor(cy), scale, scale);
 
         if (scale >= 8) {
           ctx.strokeStyle = "rgba(255,255,255,0.1)";
           ctx.lineWidth = 1;
-          ctx.strokeRect(cx + 0.5, cy + 0.5, scale - 1, scale - 1);
+          ctx.strokeRect(
+            Math.floor(cx) + 0.5,
+            Math.floor(cy) + 0.5,
+            scale - 1,
+            scale - 1
+          );
         }
       }
     }
@@ -324,8 +337,8 @@ export default function PixelBoard() {
         overlayImg,
         (overlayOffset.x - offset.x) * scale,
         (overlayOffset.y - offset.y) * scale,
-        25 * scale,
-        25 * scale
+        30 * scale, // Thay đổi từ 50 thành 30
+        30 * scale // Thay đổi từ 50 thành 30
       );
       ctx.globalAlpha = 1;
     }
@@ -449,14 +462,14 @@ export default function PixelBoard() {
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !isMounted) return; // 🔧 FIX: Only draw after mounted
+    if (!canvas || !isMounted) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     canvas.width = canvasWidth;
     canvas.height = canvasHeight;
     draw(ctx);
   }, [
-    isMounted, // 🔧 FIX: Add isMounted dependency
+    isMounted,
     scale,
     offset.x,
     offset.y,
@@ -467,7 +480,8 @@ export default function PixelBoard() {
     pixelUpdates,
     overlayImg,
     overlayOpacity,
-    overlayOffset,
+    overlayOffset.x, // ✅ Tách ra thành từng property
+    overlayOffset.y, // ✅ Thay vì whole object
     isSelectingNFTArea,
     nftSelectionStart,
     nftSelectionEnd,
@@ -714,9 +728,9 @@ export default function PixelBoard() {
       overlayImg &&
       !overlayLocked &&
       pos.x >= overlayOffset.x &&
-      pos.x < overlayOffset.x + 25 &&
+      pos.x < overlayOffset.x + 30 && // Thay đổi từ 50 thành 30
       pos.y >= overlayOffset.y &&
-      pos.y < overlayOffset.y + 25 &&
+      pos.y < overlayOffset.y + 30 && // Thay đổi từ 50 thành 30
       !isInteractionDisabled
     ) {
       draggingOverlay.current = true;
@@ -767,11 +781,16 @@ export default function PixelBoard() {
     ) {
       const dx = (pos.clientX - lastMouse.current.x) / scale;
       const dy = (pos.clientY - lastMouse.current.y) / scale;
-      setOverlayOffset((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
+
+      // 🎯 ROUND to integers để tránh decimal coordinates
+      setOverlayOffset((prev) => ({
+        x: Math.round(prev.x + dx),
+        y: Math.round(prev.y + dy),
+      }));
+
       lastMouse.current = { x: pos.clientX, y: pos.clientY };
       return;
     }
-
     // Handle canvas dragging
     if (dragging.current && !isInteractionDisabled) {
       const dx = (lastMouse.current.x - pos.clientX) / scale;
@@ -875,7 +894,13 @@ export default function PixelBoard() {
     ) {
       const dx = (e.clientX - lastMouse.current.x) / scale;
       const dy = (e.clientY - lastMouse.current.y) / scale;
-      setOverlayOffset((prev) => ({ x: prev.x + dx, y: prev.y + dy }));
+
+      // 🎯 ROUND to integers để tránh decimal coordinates
+      setOverlayOffset((prev) => ({
+        x: Math.round(prev.x + dx),
+        y: Math.round(prev.y + dy),
+      }));
+
       lastMouse.current = { x: e.clientX, y: e.clientY };
     }
   };
@@ -958,22 +983,29 @@ export default function PixelBoard() {
     const delta = e.deltaY > 0 ? -1 : 1;
     const newScale = Math.max(MIN_SCALE, Math.min(40, scale + delta));
 
-    const newOffsetX = Math.max(
-      0,
-      Math.min(CANVAS_SIZE - canvasWidth / newScale, worldX - mouseX / newScale)
+    // 🎯 ROUND offset to integers
+    const newOffsetX = Math.round(
+      Math.max(
+        0,
+        Math.min(
+          CANVAS_SIZE - canvasWidth / newScale,
+          worldX - mouseX / newScale
+        )
+      )
     );
-    const newOffsetY = Math.max(
-      0,
-      Math.min(
-        CANVAS_SIZE - canvasHeight / newScale,
-        worldY - mouseY / newScale
+    const newOffsetY = Math.round(
+      Math.max(
+        0,
+        Math.min(
+          CANVAS_SIZE - canvasHeight / newScale,
+          worldY - mouseY / newScale
+        )
       )
     );
 
     setScale(newScale);
     setOffset({ x: newOffsetX, y: newOffsetY });
   };
-
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !isMounted) return; // 🔧 FIX: Only add listener after mounted
@@ -989,41 +1021,87 @@ export default function PixelBoard() {
     reader.onload = (event) => {
       const img = new Image();
       img.onload = () => {
-        // Create a 25x25 preview canvas
+        // Tạo canvas 30x30
         const canvas = document.createElement("canvas");
-        canvas.width = 25;
-        canvas.height = 25;
+        canvas.width = 30;
+        canvas.height = 30;
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
 
-        // Draw image scaled to 25x25
-        ctx.imageSmoothingEnabled = false; // For pixelated effect
-        ctx.drawImage(img, 0, 0, 25, 25);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.fillStyle = "#111111";
+        ctx.fillRect(0, 0, 30, 30);
 
-        // Create the preview image
+        const aspectRatio = img.width / img.height;
+        let drawWidth = 30,
+          drawHeight = 30,
+          offsetX = 0,
+          offsetY = 0;
+        if (aspectRatio > 1) {
+          drawHeight = 30 / aspectRatio;
+          offsetY = (30 - drawHeight) / 2;
+        } else {
+          drawWidth = 30 * aspectRatio;
+          offsetX = (30 - drawWidth) / 2;
+        }
+        ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+
+        // Extract pixel data với màu gốc
+        const pixelData: { x: number; y: number; color: string }[] = [];
+        const imageData = ctx.getImageData(0, 0, 30, 30);
+
+        for (let y = 0; y < 30; y++) {
+          for (let x = 0; x < 30; x++) {
+            const index = (y * 30 + x) * 4;
+            const r = imageData.data[index];
+            const g = imageData.data[index + 1];
+            const b = imageData.data[index + 2];
+            const a = imageData.data[index + 3];
+
+            // Chỉ lưu pixel không trong suốt
+            if (a > 128) {
+              // 🎨 LẤY LUÔN MÀU GỐC - không map về palette
+              const originalColor = rgbToHex(r, g, b);
+
+              // Skip nếu là background đen
+              if (originalColor !== "#111111" && originalColor !== "#000000") {
+                pixelData.push({
+                  x,
+                  y,
+                  color: originalColor, // Màu gốc từ ảnh
+                });
+              }
+            }
+          }
+        }
+
+        setOverlayPixelData(pixelData);
+        console.log(
+          `Extracted ${pixelData.length} pixels with original colors`
+        );
+
+        // Tạo preview image
         const previewImg = new Image();
         previewImg.onload = () => {
           setOverlayImg(previewImg);
-
-          // Set overlay position to hover position if available, otherwise use default
           if (selectedPixel) {
             setOverlayOffset({ x: selectedPixel.x, y: selectedPixel.y });
+          } else if (hoverPixel) {
+            setOverlayOffset({ x: hoverPixel.x, y: hoverPixel.y });
           } else {
-            if (hoverPixel) {
-              setOverlayOffset({ x: hoverPixel.x, y: hoverPixel.y }); // Default position
-            } else {
-              setOverlayOffset({ x: 5, y: 5 }); // Default position
-            }
+            setOverlayOffset({ x: 5, y: 5 });
           }
         };
-        previewImg.src = canvas.toDataURL();
+        previewImg.src = canvas.toDataURL("image/png");
       };
       img.src = event.target?.result as string;
     };
     reader.readAsDataURL(file);
-
-    // Clear the input so same file can be selected again
     e.target.value = "";
+  };
+  const rgbToHex = (r: number, g: number, b: number): string => {
+    return "#" + [r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("");
   };
 
   const handlePaint = async () => {
@@ -1074,7 +1152,78 @@ export default function PixelBoard() {
       setPixelUpdates((prev) => ({ ...prev, [key]: selectedColor }));
     }
   };
+  const handleQuickPaint = async () => {
+    if (!overlayPixelData.length || !overlayImg) {
+      setToast({ message: "No image data to paint!", type: "error" });
+      return;
+    }
 
+    setIsQuickPainting(true);
+    try {
+      let successCount = 0;
+      let outOfBounds = 0;
+      const updates: Record<string, string> = {};
+
+      const roundedOffsetX = Math.round(overlayOffset.x);
+      const roundedOffsetY = Math.round(overlayOffset.y);
+
+      console.log("Rounded offset:", { x: roundedOffsetX, y: roundedOffsetY });
+
+      for (const pixel of overlayPixelData) {
+        // Sử dụng tọa độ đã làm tròn
+        const absoluteX = roundedOffsetX + pixel.x;
+        const absoluteY = roundedOffsetY + pixel.y;
+
+        // 🔍 DEBUG: Log một vài pixel đầu
+        if (successCount < 3) {
+          console.log(
+            `Pixel ${successCount}: (${pixel.x}, ${pixel.y}) -> (${absoluteX}, ${absoluteY}) color: ${pixel.color}`
+          );
+        }
+
+        // Kiểm tra bounds
+        if (
+          absoluteX >= 0 &&
+          absoluteX < CANVAS_SIZE &&
+          absoluteY >= 0 &&
+          absoluteY < CANVAS_SIZE
+        ) {
+          const key = `${absoluteX},${absoluteY}`;
+          updates[key] = pixel.color;
+          successCount++;
+        } else {
+          outOfBounds++;
+        }
+      }
+
+      if (Object.keys(updates).length > 0) {
+        // Local update
+        setLocalPixelUpdates((prev) => {
+          const newState = { ...prev, ...updates };
+          console.log("New local pixel count:", Object.keys(newState).length);
+
+          // Debug: Check if some pixels are actually set
+          const sampleKeys = Object.keys(updates).slice(0, 3);
+
+          return newState;
+        });
+      } else {
+        setToast({
+          message: `❌ No pixels painted! All ${outOfBounds} pixels out of bounds`,
+          type: "error",
+        });
+      }
+    } catch (error) {
+      console.error("Quick paint error:", error);
+      setToast({ message: "Quick paint failed!", type: "error" });
+    } finally {
+      setToast({
+        message: `✅ Quick Paint success`,
+        type: "success",
+      });
+      setIsQuickPainting(false);
+    }
+  };
   const handleBombAction = async () => {
     if (!viem) return;
     const bombCount = (await client?.readContract({
@@ -1485,7 +1634,6 @@ export default function PixelBoard() {
       setToast({ message: "NFT minting failed!", type: "error" });
     }
   };
-  const getNFTCountFromContract = async () => {};
   // Clean up effects
   useEffect(() => {
     const timer = setInterval(() => {
@@ -1942,9 +2090,33 @@ export default function PixelBoard() {
             )}
           </div>
 
-          <div className="w-12 text-right">
+          <div className="flex items-center gap-2 text-right">
+            {overlayImg && overlayPixelData.length > 0 && (
+              <button
+                onClick={handleQuickPaint}
+                disabled={isQuickPainting || isInteractionDisabled}
+                className={`w-12 h-12 rounded flex items-center justify-center text-lg font-bold relative ${
+                  isQuickPainting
+                    ? "bg-yellow-600 animate-pulse"
+                    : "bg-green-600 hover:bg-green-700"
+                }`}
+                title={`Quick paint ${overlayPixelData.length} pixels`}
+              >
+                {isQuickPainting ? (
+                  <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                ) : (
+                  "⚡"
+                )}
+                {overlayPixelData.length > 0 && !isQuickPainting && (
+                  <span className="absolute -top-1 -right-1 bg-green-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                    {Math.min(overlayPixelData.length, 99)}
+                  </span>
+                )}
+              </button>
+            )}
+
             <button
-              onClick={handleReloadAsset} // hàm reload bạn tự định nghĩa
+              onClick={handleReloadAsset}
               className="w-12 h-12 bg-slate-700 hover:bg-slate-600 rounded flex items-center justify-center text-lg font-bold relative"
               title="Reload"
             >

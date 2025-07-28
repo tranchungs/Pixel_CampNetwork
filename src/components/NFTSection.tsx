@@ -91,7 +91,7 @@ const NFTSection: React.FC<NFTSectionProps> = ({
           onClick={fetchUserNFTs}
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm transition-colors"
         >
-          🔄 Thử lại
+          🔄 Reload
         </button>
       </div>
     );
