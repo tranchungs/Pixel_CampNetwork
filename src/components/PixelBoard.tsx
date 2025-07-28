@@ -1131,6 +1131,7 @@ export default function PixelBoard() {
           to: CONTRACT_ADDRESS, // Replace with actual address
           data: data, // Empty data for simple transfer
           value: BigInt(0),
+          account: walletAddress as `0x${string}`,
         });
         const receipt = await client.waitForTransactionReceipt({
           hash,
@@ -1283,6 +1284,7 @@ export default function PixelBoard() {
           to: CONTRACT_ADDRESS, // Replace with actual address
           data: data, // Empty data for simple transfer
           value: BigInt(0),
+          account: walletAddress as `0x${string}`,
         });
         const receipt = await client.waitForTransactionReceipt({
           hash,
@@ -1385,11 +1387,13 @@ export default function PixelBoard() {
             id: targetId,
           },
         ]);
+
         const walletClient = viem.walletClient || viem;
         const hash = await walletClient.sendTransaction({
           to: CONTRACT_ADDRESS,
           data: data,
           value: BigInt(0),
+          account: walletAddress as `0x${string}`,
         });
         const receipt = await client.waitForTransactionReceipt({
           hash,
@@ -1448,6 +1452,7 @@ export default function PixelBoard() {
           to: CONTRACT_ADDRESS,
           data: data,
           value: parseEther(`${totalCost}`),
+          account: walletAddress as `0x${string}`,
         });
         const receipt = await client.waitForTransactionReceipt({
           hash,
@@ -1478,6 +1483,7 @@ export default function PixelBoard() {
           to: CONTRACT_ADDRESS, // Replace with actual address
           data: data, // Empty data for simple transfer
           value: parseEther(`${totalCost}`),
+          account: walletAddress as `0x${string}`,
         });
         const receipt = await client.waitForTransactionReceipt({
           hash,
@@ -1610,6 +1616,7 @@ export default function PixelBoard() {
           to: CONTRACT_ADDRESS, // Replace with actual address
           data: data, // Empty data for simple transfer
           value: BigInt(0),
+          account: walletAddress as `0x${string}`,
         });
         const receipt = await client.waitForTransactionReceipt({
           hash,
