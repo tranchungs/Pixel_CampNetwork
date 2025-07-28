@@ -178,24 +178,3 @@ export const getPinataService = (
 };
 
 export default PinataService;
-
-// Usage example:
-/*
-// In your component:
-import { getPinataService } from './pinataService';
-
-const pinata = getPinataService();
-
-// Upload complete NFT
-const result = await pinata.uploadCompleteNFT(nftImageDataURL, {
-  name: "My Pixel Art NFT",
-  description: "Created on pixel canvas",
-  attributes: [
-    { trait_type: "Width", value: 10 },
-    { trait_type: "Height", value: 10 }
-  ]
-});
-
-// Use result.tokenURI for smart contract
-console.log("Token URI:", result.tokenURI);
-*/

@@ -3,7 +3,7 @@
 import { CampModal, useAuth } from "@campnetwork/origin/react";
 import Game from "@/components/GameCanvas";
 import { useState, useEffect } from "react";
-
+import AnimatedCampLogo from "@/components/CampLogoPixel";
 export default function Auth() {
   const { jwt, origin, viem } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
@@ -38,50 +38,7 @@ export default function Auth() {
           </p>
 
           <div className="mx-auto w-[120px] h-[120px] grid grid-cols-10 grid-rows-10 gap-[1px] bg-gradient-to-br from-gray-900 to-black p-[3px] rounded-lg shadow-inner">
-            {Array.from({ length: 100 }).map((_, i) => {
-              const x = i % 10;
-              const y = Math.floor(i / 10);
-
-              // vẽ logo Camp Network mini
-              const isCampLogo =
-                // Vòng ngoài chữ C
-                ((x === 1 || x === 2 || x === 7 || x === 8) &&
-                  y >= 2 &&
-                  y <= 7) ||
-                ((x === 3 || x === 6) && (y === 1 || y === 8)) ||
-                ((x === 4 || x === 5) && (y === 0 || y === 9)) ||
-                // Ngọn lửa cam (vị trí 4,3 và 5,3 và 4,4)
-                ((x === 4 || x === 5) && y === 3) ||
-                (x === 4 && y === 4) ||
-                // Đỉnh núi ở dưới
-                ((x === 3 || x === 4 || x === 5 || x === 6) && y === 6) ||
-                ((x === 4 || x === 5) && y === 7);
-
-              // Màu sắc khác nhau cho các phần logo
-              const isFlame =
-                ((x === 4 || x === 5) && y === 3) || (x === 4 && y === 4);
-              const isMountain =
-                ((x === 3 || x === 4 || x === 5 || x === 6) && y === 6) ||
-                ((x === 4 || x === 5) && y === 7);
-
-              // vùng rỗng bên trong chữ C
-              const hole = x >= 4 && x <= 5 && y >= 2 && y <= 5 && !isFlame;
-
-              return (
-                <div
-                  key={i}
-                  className={`w-[9px] h-[9px] rounded-[1px] transition-all duration-300 ${
-                    isFlame
-                      ? "bg-gradient-to-br from-orange-400 to-orange-600 shadow-sm"
-                      : isMountain
-                      ? "bg-white shadow-sm"
-                      : isCampLogo && !hole
-                      ? "bg-gray-800 border border-gray-600"
-                      : "bg-[#0a0b0f] border border-gray-800"
-                  }`}
-                />
-              );
-            })}
+            <AnimatedCampLogo></AnimatedCampLogo>
           </div>
 
           {/* Instructions */}

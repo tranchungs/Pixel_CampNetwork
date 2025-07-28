@@ -3,30 +3,20 @@
 import { useRef, useEffect, useState } from "react";
 import { useStateTogether } from "react-together";
 import { CampModal } from "@campnetwork/origin/react";
-import {
-  createWalletClient,
-  encodeFunctionData,
-  parseAbi,
-  parseEther,
-  webSocket,
-} from "viem";
+import { encodeFunctionData, parseAbi, parseEther } from "viem";
 import { myCustomChain } from "./MyCustomChain";
 import TransactionToast from "./TransactionToast";
 import { createPublicClient, http } from "viem";
-import { useAuth, useViem } from "@campnetwork/origin/react";
+import { useAuth, useConnect, useAuthState } from "@campnetwork/origin/react";
 import BombTargetHighlight from "./BombTargetHighlight";
 import BoomEffect from "./BoomEffect";
 import RocketStrike from "./RocketEffect";
-import {
-  useAccount,
-  useConnect,
-  useDisconnect,
-  useSendTransaction,
-  useSwitchChain,
-} from "wagmi";
-
 import WeaponShop, { WeaponType, WeaponItem } from "./WeaponShop";
 import { getPinataService } from "./pinataService";
+import SimpleNFTSuccessModal, {
+  useSimpleNFTModal,
+} from "./SimpleNFTSuccessModal";
+import NFTModal from "./NFTModal";
 
 // Internal BoomEffect Component
 const CANVAS_SIZE = 500;
@@ -122,7 +112,8 @@ const COLORS = [
   "#20B2AA", // Xanh light sea green
   "#DC143C", // Đỏ crimson
 ];
-const CONTRACT_ADDRESS = "0x40C1c12be203d7F439960B8E7D0e56239e46913f";
+const CONTRACT_ADDRESS = process.env
+  .NEXT_PUBLIC_CONTRACT_ADDRESS as `0x${string}`;
 const CONTRACT_ABI = parseAbi([
   "event AreaBombed(address indexed user, uint256 x, uint256 y, uint256 radius)",
   "event RocketFired(address indexed user, uint256 x, uint256 y, uint256 radius)",
@@ -153,9 +144,10 @@ export default function PixelBoard() {
     "selectedColor",
     "#FFD635"
   );
-  const { origin, jwt, viem } = useAuth();
-  const { data: hash, sendTransaction } = useSendTransaction();
-  const { isConnected, address } = useAccount();
+  const { origin, jwt, viem, walletAddress } = useAuth();
+  const auth = useAuth();
+  const { authenticated, loading } = useAuthState();
+  const { connect } = useConnect();
   // 🔧 FIX: Canvas size state instead of direct window access
   const [canvasSize, setCanvasSize] = useState({
     width: DEFAULT_CANVAS_WIDTH,
@@ -244,6 +236,16 @@ export default function PixelBoard() {
   const [isClaimingDaily, setIsClaimingDaily] = useState(false);
   const [canClaimDaily, setCanClaimDaily] = useState(false);
   const pinata = getPinataService();
+  //NFT
+  const {
+    isVisible,
+    transactionHash, // ✅ Lấy từ hook
+    nftImage: modalNftImage,
+    coordinates,
+    size,
+    showSuccess,
+    hideSuccess,
+  } = useSimpleNFTModal();
   // 🔧 FIX: Handle canvas sizing after component mounts
   useEffect(() => {
     setIsMounted(true);
@@ -261,7 +263,21 @@ export default function PixelBoard() {
     window.addEventListener("resize", updateCanvasSize);
     return () => window.removeEventListener("resize", updateCanvasSize);
   }, []);
-
+  useEffect(() => {
+    // Auto-reconnect khi component mount
+    if (!authenticated && !loading) {
+      auth
+        .recoverProvider()
+        .then(() => {
+          if (auth.isAuthenticated) {
+            console.log("✅ Wallet reconnected automatically!");
+          }
+        })
+        .catch(() => {
+          console.log("ℹ️ No previous session - manual connect required");
+        });
+    }
+  }, []);
   // Use canvas size from state
   const canvasWidth = canvasSize.width;
   const canvasHeight = canvasSize.height;
@@ -464,7 +480,7 @@ export default function PixelBoard() {
 
   // Load bomb count
   const loadBombCount = async () => {
-    if (!origin || !isConnected) {
+    if (!origin || !viem) {
       return;
     }
     try {
@@ -472,7 +488,7 @@ export default function PixelBoard() {
         address: CONTRACT_ADDRESS,
         abi: CONTRACT_ABI,
         functionName: "bombs",
-        args: [address as `0x${string}`],
+        args: [walletAddress as `0x${string}`],
       });
 
       setUserBombs(Number(bombCount));
@@ -481,7 +497,7 @@ export default function PixelBoard() {
     }
   };
   const loadRocketCount = async () => {
-    if (!origin || !isConnected) {
+    if (!origin || !viem) {
       return;
     }
     try {
@@ -489,7 +505,7 @@ export default function PixelBoard() {
         address: CONTRACT_ADDRESS,
         abi: CONTRACT_ABI,
         functionName: "rockets",
-        args: [address as `0x${string}`],
+        args: [walletAddress as `0x${string}`],
       });
 
       setUserRockets(Number(rocketCount));
@@ -505,11 +521,11 @@ export default function PixelBoard() {
   useEffect(() => {
     loadBombCount();
     loadRocketCount();
-  }, [isConnected]);
+  }, [viem]);
 
   // Event listener for bombs
   useEffect(() => {
-    if (!isConnected || !client || !CONTRACT_ADDRESS) return;
+    if (!viem || !client || !CONTRACT_ADDRESS) return;
 
     const unwatchBombs = client.watchContractEvent({
       address: CONTRACT_ADDRESS,
@@ -518,7 +534,7 @@ export default function PixelBoard() {
       onLogs: (logs) => {
         for (const log of logs) {
           const { x, y, radius } = log.args;
-          const isMyBomb = log.args?.user === address;
+          const isMyBomb = log.args?.user === walletAddress;
           if (!isMyBomb) {
             setBooms((prev) => [
               ...prev,
@@ -560,7 +576,7 @@ export default function PixelBoard() {
       onLogs: (logs) => {
         for (const log of logs) {
           const { x, y, radius } = log.args;
-          const isMyRocket = log.args?.user === address;
+          const isMyRocket = log.args?.user === walletAddress;
           if (!isMyRocket) {
             setIsActive(true);
             setTargetPos({ x: Number(x), y: Number(y) });
@@ -573,10 +589,10 @@ export default function PixelBoard() {
       unwatchBombs();
       unwatchRockets();
     };
-  }, [isConnected]);
+  }, [viem]);
   //DAiLY
   const checkCanClaimDaily = async () => {
-    if (!isConnected || !client || !CONTRACT_ADDRESS || !address) {
+    if (!viem || !client || !CONTRACT_ADDRESS || !walletAddress) {
       setCanClaimDaily(false);
       return;
     }
@@ -586,7 +602,7 @@ export default function PixelBoard() {
         address: CONTRACT_ADDRESS as `0x${string}`,
         abi: CONTRACT_ABI,
         functionName: "canClaimToday",
-        args: [address as `0x${string}`],
+        args: [walletAddress as `0x${string}`],
       });
       setCanClaimDaily(Boolean(canClaim));
     } catch (error) {
@@ -596,9 +612,12 @@ export default function PixelBoard() {
   };
   useEffect(() => {
     checkCanClaimDaily();
-  }, [isConnected, address, CONTRACT_ADDRESS]);
+  }, [viem, walletAddress, CONTRACT_ADDRESS]);
   const handleClaimDaily = async () => {
-    if (!isConnected || !client || !CONTRACT_ADDRESS) return;
+    if (!viem || !origin) {
+      setToast({ message: "No wallet connected!", type: "error" });
+      return;
+    }
 
     setIsClaimingDaily(true);
     try {
@@ -613,24 +632,25 @@ export default function PixelBoard() {
         functionName: "claimDaily",
         args: [],
       });
-
-      await sendTransaction(
-        { to: CONTRACT_ADDRESS as `0x${string}`, value: FeeClaim, data },
-        {
-          onSuccess(data) {
-            const shortHash = `${data.slice(0, 6)}...${data.slice(-4)}`;
-            setToast({
-              message: `🎁 Daily rewards claimed! ${shortHash}`,
-              type: "success",
-            });
-          },
-          onError(error) {
-            setToast({ message: "Daily claim failed!", type: "error" });
-          },
-        }
-      );
+      const walletClient = viem.walletClient || viem;
+      const hash = await walletClient.sendTransaction({
+        to: CONTRACT_ADDRESS,
+        data: data,
+        value: FeeClaim,
+      });
+      const receipt = await client.waitForTransactionReceipt({
+        hash,
+        timeout: 60000, // 60 seconds timeout
+      });
+      if (receipt.status === "success") {
+        setToast({
+          message: "🎁 Daily rewards claimed!",
+          type: "success",
+        });
+      } else {
+        setToast({ message: "Daily claim failed!", type: "error" });
+      }
     } catch (error) {
-      console.log(error);
       setToast({ message: "Daily claim failed!", type: "error" });
     } finally {
       setIsClaimingDaily(false);
@@ -1011,6 +1031,10 @@ export default function PixelBoard() {
       setToast({ message: "Please select a pixel first", type: "error" });
       return;
     }
+    if (!viem || !origin) {
+      setToast({ message: "No wallet connected!", type: "error" });
+      return;
+    }
     const key = `${selectedPixel.x},${selectedPixel.y}`;
     if (isOnchain) {
       try {
@@ -1024,19 +1048,26 @@ export default function PixelBoard() {
             selectedColor,
           ],
         });
-        await sendTransaction(
-          { to: CONTRACT_ADDRESS as `0x${string}`, data },
-          {
-            onSuccess(data) {
-              setPixelUpdates((prev) => ({ ...prev, [key]: selectedColor }));
-            },
-            onError(error) {
-              setToast({ message: "Transaction failed!", type: "error" });
-            },
-          }
-        );
+        const walletClient = viem.walletClient || viem;
+        const hash = await walletClient.sendTransaction({
+          to: CONTRACT_ADDRESS, // Replace with actual address
+          data: data, // Empty data for simple transfer
+          value: BigInt(0),
+        });
+        const receipt = await client.waitForTransactionReceipt({
+          hash,
+          timeout: 60000, // 60 seconds timeout
+        });
+        if (receipt.status === "success") {
+          setToast({
+            message: "Pixel placed successfully!",
+            type: "success",
+          });
+          setPixelUpdates((prev) => ({ ...prev, [key]: selectedColor }));
+        } else {
+          throw new Error("Transaction reverted");
+        }
       } catch (err) {
-        console.log(err);
         setToast({ message: "Transaction failed!", type: "error" });
       }
     } else {
@@ -1045,17 +1076,17 @@ export default function PixelBoard() {
   };
 
   const handleBombAction = async () => {
-    if (!isConnected) return;
+    if (!viem) return;
     const bombCount = (await client?.readContract({
       address: CONTRACT_ADDRESS as `0x${string}`,
       abi: CONTRACT_ABI,
       functionName: "bombs",
-      args: [address as `0x${string}`],
+      args: [walletAddress as `0x${string}`],
     })) as bigint;
 
     if (bombCount <= 0) {
       // Buy bomb
-      if (!origin || !isConnected) return;
+      if (!origin || !viem) return;
       const price = (await client.readContract({
         address: CONTRACT_ADDRESS as `0x${string}`,
         abi: CONTRACT_ABI,
@@ -1077,6 +1108,7 @@ export default function PixelBoard() {
         });
         return;
       }
+
       setToast({
         message: "Wait confirm in wallet!",
         type: "success",
@@ -1097,51 +1129,52 @@ export default function PixelBoard() {
           functionName: "bombArea",
           args: [BigInt(selectedPixel.x), BigInt(selectedPixel.y), BigInt(3)],
         });
-        await sendTransaction(
-          { to: CONTRACT_ADDRESS as `0x${string}`, data },
-          {
-            onSuccess(data) {
-              setTargetHighlights((prev) =>
-                prev.filter((t) => t.id !== targetId)
-              );
-              setBooms((prev) => [
-                ...prev,
-                {
-                  x: selectedPixel.x,
-                  y: selectedPixel.y,
-                  radius: 3,
-                  id: Date.now(),
-                },
-              ]);
+        const walletClient = viem.walletClient || viem;
+        const hash = await walletClient.sendTransaction({
+          to: CONTRACT_ADDRESS, // Replace with actual address
+          data: data, // Empty data for simple transfer
+          value: BigInt(0),
+        });
+        const receipt = await client.waitForTransactionReceipt({
+          hash,
+          timeout: 60000, // 60 seconds timeout
+        });
+        if (receipt.status === "success") {
+          setTargetHighlights((prev) => prev.filter((t) => t.id !== targetId));
+          setBooms((prev) => [
+            ...prev,
+            {
+              x: selectedPixel.x,
+              y: selectedPixel.y,
+              radius: 3,
+              id: Date.now(),
+            },
+          ]);
 
-              const shortHash = `${data.slice(0, 6)}...${data.slice(-4)}`;
-              setToast({ message: `💥 BOOM! ${shortHash}`, type: "success" });
+          const shortHash = `${hash.slice(0, 6)}...${hash.slice(-4)}`;
+          setToast({ message: `💥 BOOM! ${shortHash}`, type: "success" });
 
-              // Clear pixels immediately
-              const updates: Record<string, string> = {};
-              for (let dx = -3; dx <= 3; dx++) {
-                for (let dy = -3; dy <= 3; dy++) {
-                  const dist = Math.sqrt(dx * dx + dy * dy);
-                  if (dist <= 3) {
-                    const px = selectedPixel.x + dx;
-                    const py = selectedPixel.y + dy;
-                    const key = `${px},${py}`;
-                    updates[key] = "#111";
-                  }
-                }
+          // Clear pixels immediately
+          const updates: Record<string, string> = {};
+          for (let dx = -3; dx <= 3; dx++) {
+            for (let dy = -3; dy <= 3; dy++) {
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              if (dist <= 3) {
+                const px = selectedPixel.x + dx;
+                const py = selectedPixel.y + dy;
+                const key = `${px},${py}`;
+                updates[key] = "#111";
               }
-              setPixelUpdates((prev) => ({ ...prev, ...updates }));
-              setUserBombs(userBombs - 1);
-            },
-            onError(error) {
-              setTargetHighlights((prev) =>
-                prev.filter((t) => t.id !== targetId)
-              );
-              setToast({ message: "Bomb failed!", type: "error" });
-            },
+            }
           }
-        );
+          setPixelUpdates((prev) => ({ ...prev, ...updates }));
+          setUserBombs(userBombs - 1);
+        } else {
+          setTargetHighlights((prev) => prev.filter((t) => t.id !== targetId));
+          setToast({ message: "Bomb failed hehe!", type: "error" });
+        }
       } catch (error) {
+        console.log(`${error}`);
         setTargetHighlights((prev) => prev.filter((t) => t.id !== targetId));
         setToast({ message: "Bomb failed!", type: "error" });
       }
@@ -1149,12 +1182,12 @@ export default function PixelBoard() {
   };
 
   const handleFireRocket = async () => {
-    if (!isConnected || !origin) return;
+    if (!viem || !origin) return;
     const rocketCount = (await client.readContract({
       address: CONTRACT_ADDRESS as `0x${string}`,
       abi: CONTRACT_ABI,
       functionName: "rockets",
-      args: [address as `0x${string}`],
+      args: [walletAddress as `0x${string}`],
     })) as bigint;
     if (rocketCount <= 0) {
       const price = (await client.readContract({
@@ -1203,39 +1236,40 @@ export default function PixelBoard() {
             id: targetId,
           },
         ]);
+        const walletClient = viem.walletClient || viem;
+        const hash = await walletClient.sendTransaction({
+          to: CONTRACT_ADDRESS,
+          data: data,
+          value: BigInt(0),
+        });
+        const receipt = await client.waitForTransactionReceipt({
+          hash,
+          timeout: 60000, // 60 seconds timeout
+        });
+        if (receipt.status === "success") {
+          setIsActive(true);
+          const shortHash = `${hash.slice(0, 6)}...${hash.slice(-4)}`;
+          setToast({ message: `💥 Rocket! ${shortHash}`, type: "success" });
 
-        await sendTransaction(
-          { to: CONTRACT_ADDRESS as `0x${string}`, data },
-          {
-            onSuccess(data) {
-              setIsActive(true);
-              const shortHash = `${data.slice(0, 6)}...${data.slice(-4)}`;
-              setToast({ message: `💥 Rocket! ${shortHash}`, type: "success" });
-
-              // Clear pixels immediately
-              const updates: Record<string, string> = {};
-              for (let dx = -3; dx <= 3; dx++) {
-                for (let dy = -3; dy <= 3; dy++) {
-                  const dist = Math.sqrt(dx * dx + dy * dy);
-                  if (dist <= 3) {
-                    const px = selectedPixel.x + dx;
-                    const py = selectedPixel.y + dy;
-                    const key = `${px},${py}`;
-                    updates[key] = "#111";
-                  }
-                }
+          // Clear pixels immediately
+          const updates: Record<string, string> = {};
+          for (let dx = -3; dx <= 3; dx++) {
+            for (let dy = -3; dy <= 3; dy++) {
+              const dist = Math.sqrt(dx * dx + dy * dy);
+              if (dist <= 3) {
+                const px = selectedPixel.x + dx;
+                const py = selectedPixel.y + dy;
+                const key = `${px},${py}`;
+                updates[key] = "#111";
               }
-              setPixelUpdates((prev) => ({ ...prev, ...updates }));
-              setUserRockets(userRockets - 1);
-            },
-            onError(error) {
-              setTargetHighlights((prev) =>
-                prev.filter((t) => t.id !== targetId)
-              );
-              setToast({ message: "Bomb failed!", type: "error" });
-            },
+            }
           }
-        );
+          setPixelUpdates((prev) => ({ ...prev, ...updates }));
+          setUserRockets(userRockets - 1);
+        } else {
+          setTargetHighlights((prev) => prev.filter((t) => t.id !== targetId));
+          setToast({ message: "Bomb failed!", type: "error" });
+        }
       } catch (error) {
         setTargetHighlights((prev) => prev.filter((t) => t.id !== targetId));
         setToast({ message: "Bomb failed!", type: "error" });
@@ -1248,7 +1282,7 @@ export default function PixelBoard() {
     quantity: number,
     totalCost: number
   ) => {
-    if (!isConnected) {
+    if (!viem) {
       setToast({ message: "Disconnected!", type: "error" });
       return;
     }
@@ -1260,26 +1294,26 @@ export default function PixelBoard() {
         args: [],
       });
       try {
-        await sendTransaction(
-          {
-            to: CONTRACT_ADDRESS as `0x${string}`,
-            value: parseEther(`${totalCost}`),
-            data,
-          },
-          {
-            onSuccess(data) {
-              const shortHash = `${data.slice(0, 6)}...${data.slice(-4)}`;
-              setToast({
-                message: `💣 Bomb purchased! ${shortHash} need reload`,
-                type: "success",
-              });
-              setUserBombs(userBombs + quantity);
-            },
-            onError(error) {
-              setToast({ message: "Purchase failed!", type: "error" });
-            },
-          }
-        );
+        const walletClient = viem.walletClient || viem;
+        const hash = await walletClient.sendTransaction({
+          to: CONTRACT_ADDRESS,
+          data: data,
+          value: parseEther(`${totalCost}`),
+        });
+        const receipt = await client.waitForTransactionReceipt({
+          hash,
+          timeout: 60000, // 60 seconds timeout
+        });
+        if (receipt.status === "success") {
+          const shortHash = `${data.slice(0, 6)}...${data.slice(-4)}`;
+          setToast({
+            message: `💣 Bomb purchased! ${shortHash} need reload`,
+            type: "success",
+          });
+          setUserBombs(userBombs + quantity);
+        } else {
+          setToast({ message: "Purchase failed!", type: "error" });
+        }
       } catch (error) {
         setToast({ message: "Purchase failed!", type: "error" });
       }
@@ -1290,26 +1324,26 @@ export default function PixelBoard() {
         args: [],
       });
       try {
-        await sendTransaction(
-          {
-            to: CONTRACT_ADDRESS as `0x${string}`,
-            value: parseEther(`${totalCost}`),
-            data,
-          },
-          {
-            onSuccess(data) {
-              const shortHash = `${data.slice(0, 6)}...${data.slice(-4)}`;
-              setToast({
-                message: `💣 Rocket purchased! ${shortHash} need reload`,
-                type: "success",
-              });
-              setUserRockets(userRockets + quantity);
-            },
-            onError(error) {
-              setToast({ message: "Purchase failed!", type: "error" });
-            },
-          }
-        );
+        const walletClient = viem.walletClient || viem;
+        const hash = await walletClient.sendTransaction({
+          to: CONTRACT_ADDRESS, // Replace with actual address
+          data: data, // Empty data for simple transfer
+          value: parseEther(`${totalCost}`),
+        });
+        const receipt = await client.waitForTransactionReceipt({
+          hash,
+          timeout: 60000, // 60 seconds timeout
+        });
+        if (receipt.status === "success") {
+          const shortHash = `${hash.slice(0, 6)}...${hash.slice(-4)}`;
+          setToast({
+            message: `💣 Rocket purchased! ${shortHash} need reload`,
+            type: "success",
+          });
+          setUserRockets(userRockets + quantity);
+        } else {
+          setToast({ message: "Purchase failed!", type: "error" });
+        }
       } catch (error) {
         console.log(error);
         setToast({ message: "Purchase failed!", type: "error" });
@@ -1374,51 +1408,19 @@ export default function PixelBoard() {
     setNftSelectionEnd(null);
     setSelectedNFTArea(null);
     setNftImage(null);
-    setToast({ message: "NFT selection cancelled", type: "success" });
   };
 
-  const base64ToFile = (base64: string, filename: string): File => {
-    console.log("Original base64 length:", base64.length);
-    console.log("Base64 preview:", base64.substring(0, 100));
-
-    // Kiểm tra format base64
-    if (!base64.startsWith("data:image/")) {
-      throw new Error("Invalid base64 format - must start with 'data:image/'");
-    }
-
-    const arr = base64.split(",");
-    if (arr.length !== 2) {
-      throw new Error("Invalid base64 format - missing comma separator");
-    }
-
-    const mime = arr[0].match(/:(.*?);/)?.[1] || "image/png";
-    const bstr = atob(arr[1]);
-
-    console.log("Decoded string length:", bstr.length);
-
-    if (bstr.length === 0) {
-      throw new Error("Decoded base64 is empty");
-    }
-
-    const u8arr = new Uint8Array(bstr.length);
-    for (let i = 0; i < bstr.length; i++) {
-      u8arr[i] = bstr.charCodeAt(i);
-    }
-
-    const file = new File([u8arr], filename, { type: mime });
-    console.log("Created file size:", file.size);
-    console.log("Created file type:", file.type);
-
-    return file;
-  };
-
-  const fetchFileFromUrl = async (
-    url: string,
-    fileName: string
+  const base64ToFile = async (
+    base64: string,
+    filename: string
   ): Promise<File> => {
-    const response = await fetch(url);
-    const blob = await response.blob();
-    return new File([blob], fileName, { type: blob.type });
+    try {
+      const response = await fetch(base64);
+      const blob = await response.blob();
+      return new File([blob], filename, { type: "image/png" });
+    } catch (error) {
+      throw new Error(`Failed to convert base64 to file: ${error}`);
+    }
   };
 
   const handleMintNFT = async () => {
@@ -1427,16 +1429,14 @@ export default function PixelBoard() {
     }
     const licence = {
       price: BigInt(0),
-      duration: 1,
+      duration: 2592000,
       royaltyBps: 0,
       paymentToken: "0x0000000000000000000000000000000000000000",
     } as const;
     try {
-      setToast({ message: "Wait confirm in Wallet", type: "success" });
       const metadata = {
         name: `Pixel Art`,
         description: `Pixel art created on canvas at coordinates (${selectedNFTArea.x}, ${selectedNFTArea.y})`,
-        image: nftImage,
         attributes: [
           { trait_type: "Width", value: selectedNFTArea.width },
           { trait_type: "Height", value: selectedNFTArea.height },
@@ -1445,38 +1445,47 @@ export default function PixelBoard() {
         ],
       };
       const result = await pinata.uploadCompleteNFT(nftImage, metadata);
-      const data = encodeFunctionData({
-        abi: CONTRACT_ABI,
-        functionName: "mintNFT",
-        args: [result.metadataIPFS],
+      console.log(result);
+      setToast({
+        message: `✅ NFT prepared! ${selectedNFTArea.width}×${selectedNFTArea.height} pixels ready to mint`,
+        type: "success",
       });
-
-      await sendTransaction(
-        { to: CONTRACT_ADDRESS as `0x${string}`, data },
-        {
-          onSuccess(data) {
-            const shortHash = `${data.slice(0, 6)}...${data.slice(-4)}`;
-            setToast({
-              message: `🎨 NFT minted! ${shortHash}`,
-              type: "success",
-            });
-
-            // Clear NFT selection after successful mint
-            setSelectedNFTArea(null);
-            setNftImage(null);
-          },
-          onError(error) {
-            setToast({ message: "NFT minting failed!", type: "error" });
-          },
+      if (result) {
+        const data = encodeFunctionData({
+          abi: CONTRACT_ABI,
+          functionName: "mintNFT",
+          args: [result.metadataIPFS],
+        });
+        const walletClient = viem.walletClient || viem;
+        const hash = await walletClient.sendTransaction({
+          to: CONTRACT_ADDRESS, // Replace with actual address
+          data: data, // Empty data for simple transfer
+          value: BigInt(0),
+        });
+        const receipt = await client.waitForTransactionReceipt({
+          hash,
+          timeout: 60000, // 60 seconds timeout
+        });
+        if (receipt.status === "success") {
+          showSuccess(
+            hash, // transaction hash
+            nftImage, // base64 image
+            { x: selectedNFTArea.x, y: selectedNFTArea.y }, // optional coords
+            { width: selectedNFTArea.width, height: selectedNFTArea.height } // optional size
+          );
+          cancelNFTSelection();
+        } else {
+          setToast({ message: "Mint NFT failed!", type: "error" });
         }
-      );
+      } else {
+        setToast({ message: "Upload NFT Fail!", type: "error" });
+      }
     } catch (error) {
       console.log(error);
       setToast({ message: "NFT minting failed!", type: "error" });
-      // DON'T clear NFT selection on failure - user can try again
     }
   };
-
+  const getNFTCountFromContract = async () => {};
   // Clean up effects
   useEffect(() => {
     const timer = setInterval(() => {
@@ -1510,30 +1519,39 @@ export default function PixelBoard() {
             {isOnchain ? "On" : "Off"}
           </button>
           <button className="text-gray-400 text-lg">⋮</button>
-          <button className="text-gray-400 text-lg">✕</button>
+          <a
+            href="https://pixel-game-campnetwork.gitbook.io/pixel-game-campnetwork-docs/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors duration-200 border border-blue-500"
+            title="View Documentation"
+          >
+            📚 Docs
+            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"></path>
+            </svg>
+          </a>
         </div>
 
         <div className="flex items-center gap-3 text-sm">
           <div className="flex items-center gap-3">
-            <a
-              href="https://pixel-game-campnetwork.gitbook.io/pixel-game-campnetwork-docs/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-400 hover:text-blue-300 transition-colors text-sm font-medium"
-              title="View Documentation"
-            >
-              📚 Docs
-            </a>
+            {/* NFT Modal Button */}
+            <NFTModal
+              contractAddress="0x40C1c12be203d7F439960B8E7D0e56239e46913f"
+              walletAddress={walletAddress as `0x${string}`} // Pass wallet address as prop
+              buttonText="NFT Collections"
+            />
+
             <button
               onClick={handleClaimDaily}
-              disabled={!isConnected || !canClaimDaily || isClaimingDaily}
+              disabled={!viem || !canClaimDaily || isClaimingDaily}
               className={`px-3 py-2 rounded-lg transition-colors flex items-center gap-1 ${
-                canClaimDaily && isConnected
+                canClaimDaily && viem
                   ? "bg-yellow-600 hover:bg-yellow-700 text-white"
                   : "bg-gray-600 text-gray-400 cursor-not-allowed"
               }`}
               title={
-                !isConnected
+                !viem
                   ? "Connect wallet first"
                   : !canClaimDaily
                   ? "Already claimed today"
@@ -1968,6 +1986,14 @@ export default function PixelBoard() {
           isConnected={origin ? true : false}
         />
       )}
+      <SimpleNFTSuccessModal
+        isVisible={isVisible}
+        onClose={hideSuccess}
+        transactionHash={transactionHash}
+        nftImage={modalNftImage}
+        coordinates={coordinates}
+        size={size}
+      />
     </div>
   );
 }
