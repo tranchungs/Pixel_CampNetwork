@@ -1698,18 +1698,20 @@ export default function PixelBoard() {
 
         <div className="flex items-center gap-3 text-sm">
           <div className="flex items-center gap-3">
-            {/* NFT Modal Button */}
+            {/* 🏪 Simple Marketplace Button */}
             <button
-              onClick={() => setIsMarketplaceOpen(true)} // ✅ Control from parent
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"
+              onClick={() => setIsMarketplaceOpen(true)}
+              className="px-3 py-2 rounded-lg text-white bg-green-600 hover:bg-green-700 transition-colors duration-200 flex items-center gap-2"
             >
-              🏪 Marketplace
+              <span className="text-sm">🏪</span>
+              <span className="text-sm font-medium">Marketplace</span>
             </button>
 
+            {/* 🎁 Simple Claim Button */}
             <button
               onClick={handleClaimDaily}
               disabled={!viem || !canClaimDaily || isClaimingDaily}
-              className={`px-3 py-2 rounded-lg transition-colors flex items-center gap-1 ${
+              className={`px-3 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2 ${
                 canClaimDaily && viem
                   ? "bg-yellow-600 hover:bg-yellow-700 text-white"
                   : "bg-gray-600 text-gray-400 cursor-not-allowed"
@@ -1725,13 +1727,14 @@ export default function PixelBoard() {
               {isClaimingDaily ? (
                 <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
               ) : (
-                <span className="text-lg">{canClaimDaily ? "🎁" : "⏰"}</span>
+                <span className="text-sm">{canClaimDaily ? "🎁" : "⏰"}</span>
               )}
               <span className="text-sm font-medium">
                 {canClaimDaily ? "Claim" : "Claimed"}
               </span>
             </button>
           </div>
+
           <CampModal />
         </div>
       </div>
