@@ -16,7 +16,8 @@ import { getPinataService } from "./pinataService";
 import SimpleNFTSuccessModal, {
   useSimpleNFTModal,
 } from "./SimpleNFTSuccessModal";
-import NFTModal from "./NFTModal";
+
+import MarketplaceModal from "./MarketplaceModal";
 
 // Internal BoomEffect Component
 const CANVAS_SIZE = 500;
@@ -251,6 +252,12 @@ export default function PixelBoard() {
   const [overlayPixelData, setOverlayPixelData] = useState<
     { x: number; y: number; color: string }[]
   >([]);
+  //MARKET
+  const [isMarketplaceOpen, setIsMarketplaceOpen] = useState(false);
+  // Add states
+  const [showMarketplace, setShowMarketplace] = useState(false);
+  const [showNFTListing, setShowNFTListing] = useState(false);
+  const [isNFTMinting, setIsNFTMinting] = useState(false);
   // 🔧 FIX: Handle canvas sizing after component mounts
   useEffect(() => {
     setIsMounted(true);
@@ -1641,6 +1648,7 @@ export default function PixelBoard() {
       setToast({ message: "NFT minting failed!", type: "error" });
     }
   };
+
   // Clean up effects
   useEffect(() => {
     const timer = setInterval(() => {
@@ -1691,11 +1699,12 @@ export default function PixelBoard() {
         <div className="flex items-center gap-3 text-sm">
           <div className="flex items-center gap-3">
             {/* NFT Modal Button */}
-            <NFTModal
-              contractAddress="0x40C1c12be203d7F439960B8E7D0e56239e46913f"
-              walletAddress={walletAddress as `0x${string}`} // Pass wallet address as prop
-              buttonText="NFT Collections"
-            />
+            <button
+              onClick={() => setIsMarketplaceOpen(true)} // ✅ Control from parent
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"
+            >
+              🏪 Marketplace
+            </button>
 
             <button
               onClick={handleClaimDaily}
@@ -2039,7 +2048,7 @@ export default function PixelBoard() {
 
       {/* Color Palette Overlay */}
       {showColorPalette && (
-        <div className="fixed inset-0 bg-[#00000038] flex items-end z-50">
+        <div className="fixed inset-0 bg-[#00000038] flex items-end z-48">
           <div className="w-full bg-slate-800 rounded-t-2xl max-h-96 flex flex-col">
             {/* Header cố định */}
             <div className="flex justify-between items-center p-4 pb-2 border-b border-slate-700 bg-slate-800 rounded-t-2xl">
@@ -2077,7 +2086,7 @@ export default function PixelBoard() {
       )}
 
       {/* Bottom Controls - Fixed to bottom */}
-      <div className="bg-slate-800 border-t border-slate-700 z-50">
+      <div className="bg-slate-800 border-t border-slate-700 z-49">
         {/* Info Section */}
         <div className="flex items-center justify-between px-4 py-3">
           {/* Color Selector */}
@@ -2165,6 +2174,12 @@ export default function PixelBoard() {
           isConnected={origin ? true : false}
         />
       )}
+      <MarketplaceModal
+        isVisible={isMarketplaceOpen} // ✅ Control state
+        onClose={() => setIsMarketplaceOpen(false)} // ✅ Control close
+        contractAddress={CONTRACT_ADDRESS}
+        walletAddress={walletAddress as `0x${string}`}
+      />
       <SimpleNFTSuccessModal
         isVisible={isVisible}
         onClose={hideSuccess}
