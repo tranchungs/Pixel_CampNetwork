@@ -114,8 +114,8 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
         label: "Floor Price",
         value: stats.floor
           ? formatCurrency(
-              stats.floor.amount,
-              stats.floor.currency.abbreviation
+              stats.floor.amount || 0,
+              stats.floor.currency.abbreviation || "CAMP"
             )
           : "—",
         gradient: "from-green-500 to-emerald-500",
@@ -124,8 +124,8 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
         label: "Top Offer",
         value: stats.topOffer
           ? formatCurrency(
-              stats.topOffer.amount,
-              stats.topOffer.currency.abbreviation
+              stats.topOffer.amount || 0,
+              stats.topOffer.currency.abbreviation || "CAMP"
             )
           : "—",
         gradient: "from-blue-500 to-cyan-500",
@@ -133,8 +133,8 @@ const MarketplaceModal: React.FC<MarketplaceModalProps> = ({
       {
         label: "24h Vol",
         value: formatCurrency(
-          stats.dayVolume.amount,
-          stats.dayVolume.currency.abbreviation
+          stats.dayVolume?.amount || 0,
+          stats.dayVolume?.currency.abbreviation || "CAMP"
         ),
         gradient: "from-purple-500 to-pink-500",
       },

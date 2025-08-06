@@ -1608,6 +1608,8 @@ export default function PixelBoard() {
       };
       const result = await pinata.uploadCompleteNFT(nftImage, metadata);
       console.log(result);
+      const file = await base64ToFile(nftImage, "pixelart.png");
+      await origin.uploadFile(file);
       setToast({
         message: `✅ NFT prepared! ${selectedNFTArea.width}×${selectedNFTArea.height} pixels ready to mint`,
         type: "success",
