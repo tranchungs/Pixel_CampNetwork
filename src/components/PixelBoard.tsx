@@ -1112,52 +1112,58 @@ export default function PixelBoard() {
   };
 
   const handlePaint = async () => {
-    if (!selectedPixel) {
-      setToast({ message: "Please select a pixel first", type: "error" });
-      return;
-    }
-    if (!viem || !origin) {
-      setToast({ message: "No wallet connected!", type: "error" });
-      return;
-    }
-    const key = `${selectedPixel.x},${selectedPixel.y}`;
-    if (isOnchain) {
-      try {
-        setToast({ message: "Wait confirm transaction", type: "success" });
-        const data = encodeFunctionData({
-          abi: CONTRACT_ABI,
-          functionName: "placePixel",
-          args: [
-            BigInt(selectedPixel.x),
-            BigInt(selectedPixel.y),
-            selectedColor,
-          ],
-        });
-        const walletClient = viem.walletClient || viem;
-        const hash = await walletClient.sendTransaction({
-          to: CONTRACT_ADDRESS, // Replace with actual address
-          data: data, // Empty data for simple transfer
-          value: BigInt(0),
-          account: walletAddress as `0x${string}`,
-        });
-        const receipt = await client.waitForTransactionReceipt({
-          hash,
-          timeout: 60000, // 60 seconds timeout
-        });
-        if (receipt.status === "success") {
-          setToast({
-            message: "Pixel placed successfully!",
-            type: "success",
-          });
-          setPixelUpdates((prev) => ({ ...prev, [key]: selectedColor }));
-        } else {
-          throw new Error("Transaction reverted");
-        }
-      } catch (err) {
-        setToast({ message: "Transaction failed!", type: "error" });
+    try {
+      await viem.switchChain(myCustomChain);
+      if (!selectedPixel) {
+        setToast({ message: "Please select a pixel first", type: "error" });
+        return;
       }
-    } else {
-      setPixelUpdates((prev) => ({ ...prev, [key]: selectedColor }));
+      if (!viem || !origin) {
+        setToast({ message: "No wallet connected!", type: "error" });
+        return;
+      }
+      const key = `${selectedPixel.x},${selectedPixel.y}`;
+      if (isOnchain) {
+        try {
+          setToast({ message: "Wait confirm transaction", type: "success" });
+          const data = encodeFunctionData({
+            abi: CONTRACT_ABI,
+            functionName: "placePixel",
+            args: [
+              BigInt(selectedPixel.x),
+              BigInt(selectedPixel.y),
+              selectedColor,
+            ],
+          });
+          const walletClient = viem.walletClient || viem;
+          const hash = await walletClient.sendTransaction({
+            to: CONTRACT_ADDRESS, // Replace with actual address
+            data: data, // Empty data for simple transfer
+            value: BigInt(0),
+            account: walletAddress as `0x${string}`,
+          });
+          const receipt = await client.waitForTransactionReceipt({
+            hash,
+            timeout: 60000, // 60 seconds timeout
+          });
+          if (receipt.status === "success") {
+            setToast({
+              message: "Pixel placed successfully!",
+              type: "success",
+            });
+            setPixelUpdates((prev) => ({ ...prev, [key]: selectedColor }));
+          } else {
+            throw new Error("Transaction reverted");
+          }
+        } catch (err) {
+          console.log(err);
+          setToast({ message: "Transaction failed!", type: "error" });
+        }
+      } else {
+        setPixelUpdates((prev) => ({ ...prev, [key]: selectedColor }));
+      }
+    } catch (error) {
+      console.log(error);
     }
   };
   const handleQuickPaint = async () => {
@@ -1234,6 +1240,7 @@ export default function PixelBoard() {
   };
   const handleBombAction = async () => {
     if (!viem) return;
+    await viem.switchChain(myCustomChain);
     const bombCount = (await client?.readContract({
       address: CONTRACT_ADDRESS as `0x${string}`,
       abi: CONTRACT_ABI,
@@ -1341,6 +1348,7 @@ export default function PixelBoard() {
 
   const handleFireRocket = async () => {
     if (!viem || !origin) return;
+    await viem.switchChain(myCustomChain);
     const rocketCount = (await client.readContract({
       address: CONTRACT_ADDRESS as `0x${string}`,
       abi: CONTRACT_ABI,
@@ -1589,6 +1597,7 @@ export default function PixelBoard() {
     if (!origin || !jwt || !selectedNFTArea || !nftImage) {
       return;
     }
+    await viem.switchChain(myCustomChain);
     const licence = {
       price: BigInt(0),
       duration: 2592000,
