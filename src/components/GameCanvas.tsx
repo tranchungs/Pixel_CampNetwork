@@ -6,8 +6,8 @@ export default function Game() {
   console.log("Game rendered");
   const sessionParams = useMemo(
     () => ({
-      apiKey: process.env.NEXT_PUBLIC_API_KEY!,
-      appId: process.env.NEXT_PUBLIC_APP_ID!,
+      apiKey: "2RP7Bs24e13LWqCQgNPFbqPCEvdPr7GSCMxCRmvepg",
+      appId: "com.example.pixel",
       name: process.env.NEXT_PUBLIC_SESSION_NAME!,
       password: process.env.NEXT_PUBLIC_SESSION_PASSWORD!,
     }),
