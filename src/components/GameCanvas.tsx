@@ -8,8 +8,6 @@ export default function Game() {
     () => ({
       apiKey: "2RP7Bs24e13LWqCQgNPFbqPCEvdPr7GSCMxCRmvepg",
       appId: "com.example.pixel",
-      name: process.env.NEXT_PUBLIC_SESSION_NAME!,
-      password: process.env.NEXT_PUBLIC_SESSION_PASSWORD!,
     }),
     []
   );
